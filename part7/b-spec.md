@@ -1,11 +1,11 @@
-# Notion
+## Notion
 * .w: 32 bits word
 * .uw: unsigned 32 bits word
 * .b: 8 bits
 * .h: 16 bits
 
 
-# Address generation instructions (Zba)
+## Address generation instructions (Zba)
 
 | 助记符  |指令意思 | 支持RV32 |
 | ----  | ---- | ---- |
@@ -19,7 +19,7 @@
 | slli.uw rd, rs1, imm      |   Shift-left unsigned word (Immediate) | 否 |
 
 
-# Basic bit-manipulation (Zbb)
+## Basic bit-manipulation (Zbb)
 
 
 | 助记符  |指令意思 | 支持RV32 |
@@ -50,7 +50,7 @@
 |  zext.h rd, rs |Zero-extend halfword |是
 
 
-# Carry-less multiplication (Zbc)
+## Carry-less multiplication (Zbc)
 
 | 助记符  |指令意思 | 支持RV32 |
 | ----  | ---- | ---- |
@@ -58,7 +58,7 @@
 |  clmulh rd, rs1, rs2 |Carry-less multiply (high-part) |是
 |  clmulr rd, rs1, rs2 |Carry-less multiply (reversed)|是
 
-# Single-bit instructions ((Zbd)
+## Single-bit instructions ((Zbd)
 
 | 助记符  |指令意思 | 支持RV32 |
 | ----  | ---- | ---- |
@@ -71,8 +71,8 @@
 |  bset rd, rs1, rs2 |Single-Bit Set (Register) |是
 |  bseti rd, rs1, imm |Single-Bit Set (Immediate) |是
 
-# Specification
+## Specification
 
-![](../assets/rv-b-spec.pdf)
+[rv-b-spec.pdf](../assets/rv-b-spec.pdf)
 
 
