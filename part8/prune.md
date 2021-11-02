@@ -32,7 +32,7 @@
 
 图2.2展示了不同颗粒度的剪枝，图中每个大方块代表三维卷积核，透明或者黄色部分表示被减掉的结构，从左到右依次是层级剪枝、核级剪枝、通道级剪枝、向量级剪枝和稀疏化矩阵，其中核级剪枝和通道级剪枝在实质上是一样的。
 
-![image-20211102143744258](.\compression_pic\image-20211102143744258.png)
+![Image](.\compression_pic\image-20211102143744258.png)
 
 ​                                                                               **图2.2**： 不同颗粒度的剪枝
 
@@ -48,7 +48,7 @@
 
 通道级剪枝，每次剪掉一个或多个通道，使输出通道数减少；核级剪枝，每次减掉一个或多个卷积核。由于前后卷积层的关系，这两个层级在本质上相同。
 
-![image-20211102143930054](.\compression_pic\image-20211102143930054.png)
+![Image](.\compression_pic\image-20211102143930054.png)
 
 ​                                                                            **图2.3**：前后卷积层中核与通道的关系
 
@@ -104,7 +104,7 @@
 
 ### 单阶段剪枝
 
-![img](.\compression_pic/clip_image002.jpg)
+![Image](.\compression_pic/clip_image002.jpg)
 
 ​                                                                                   **图2.6**：基本的单阶段剪枝流程
 
@@ -112,7 +112,7 @@
 
 单阶段剪枝也可以有微调和迭代过程，图2.8就是基于适应重要性的剪枝论文“Learning Efficient Convolutional Networks through Network Slimming”使用的剪枝流程。
 
-![img](.\compression_pic/clip_image004.jpg)
+![Image](.\compression_pic/clip_image004.jpg)
 
 ​                                                                                    **图2.7**：迭代式的单阶段剪枝
 
