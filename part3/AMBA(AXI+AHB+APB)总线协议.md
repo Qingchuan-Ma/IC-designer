@@ -312,11 +312,11 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 <img src="../assets/ahb17.png" style="zoom:50%;" />
 
-#### Handover after burst  
+#### Handover after burst
 
 <img src="../assets/ahb18.png" style="zoom:50%;" />
 
-#### Bus master grant signals  
+#### Bus master grant signals
 
 <img src="../assets/ahb19.png" style="zoom: 50%;" />
 
@@ -415,7 +415,7 @@ A：因为读数据通道中就可以包含了读相应信号。
 
 ![image-20211116150856711](../assets/axi10.png)
 
-###   读写握手
+### 读写握手
 
 AXI的5个传输通道均使用VALID/READY信号对传输过程的地址、数据、控制信号进行握手。传输源端使用VALID表明地址/控制信号、数据是有效的，目的端使用READY表明自己能够接受信息。使用双向握手机制，传输仅仅发生在VALID、READY同时有效的时候。
 
@@ -519,7 +519,7 @@ AXI 是一个 burst-based 协议，AXI 传输事务中的数据传输以 burst �
 
 - FIXED：突发传输过程中地址固定，用于FIFO访问
 - INCR：增量突发，传输过程中，地址递增。增加量取决AxSIZE的值。
-- WRAP：回环突发，和增量突发类似，但会在特定高地址的边界处回到低地址处。回环突发的长度只能是2,4,8,16次传输，传输首地址和每次传输的大小对齐。最低的地址整个传输的数据大小对齐。回环边界等于（AxSIZE*AxLEN）。
+- WRAP：回环突发，和增量突发类似，但会在特定高地址的边界处回到低地址处。回环突发的长度只能是2,4,8,16次传输，传输首地址和每次传输的大小对齐。最低的地址整个传输的数据大小对齐。回环边界等于（AxSIZE\*AxLEN）。
 
 ##### Burst地址
 
