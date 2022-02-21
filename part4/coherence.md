@@ -375,7 +375,7 @@ Given that point-to-point ordering reduces complexity, it would seem an obvious 
 
 #### silent or non-silent evictions of S
 
-* Silent PutS: 特定情况下会增加贷款，例如GetS前的PutS
+* Silent PutS: 特定情况下会增加带宽，例如GetS前的PutS
 * Explicit PutS
     - prcise sharer list
         + less Invalidation
