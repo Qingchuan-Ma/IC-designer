@@ -1,14 +1,21 @@
 # AMBA片上总线传输原理
 
-- 数据传输靠主设备（Master）发起
-- 主设备（Master）靠地址线表明需要访问的从设备（Slave）
-- 互联总线（Bus-Arbiter/Bus-Matrix/Bus-NOC）靠地址线路由访问（command/data），并最终选中目标从设备（Slave）
-- Master/Bus-Bus/Slave之间要有流量控制，防止数据丢失。
+* 数据传输靠主设备（Master）发起
+* 主设备（Master）靠地址线表明需要访问的从设备（Slave）
+* 互联总线（Bus-Arbiter/Bus-Matrix/Bus-NOC）靠地址线路由访问（command/data），并最终选中目标从设备（Slave）
+* Master/Bus-Bus/Slave之间要有流量控制，防止数据丢失。
 
 路由原理：
 
-- 单个slave内部的寄存器路由：利用地址线的低位
-- 一条总线上的多个slave路由：利用地址线的高位
+* 单个slave内部的寄存器路由：利用地址线的低位
+* 一条总线上的多个slave路由：利用地址线的高位
+
+burst传输：
+
+* 起始地址
+* 突发长度，指传输次数
+* 可以支持非连续跳跃
+
 
 ## APB（Advanced Peripheral Bus）总线
 
@@ -16,12 +23,12 @@
 
 APB(Advance Peripheral Bus)是AMBA总线的一部分，有以下几个特点：
 
-- APB主要用在低速且低功率消耗的IP接口上，协议简单，时钟clock也比较低，通常用作AHB/AXI总线的扩展。
-- 不需要仲裁器
-- 必须在时钟上升沿触发
-- 主要构成是：
-  - APB Bridge：可以锁存所有的地址、数据和控制信号，并译码产生APB Slave的SEL信号。
-  - APB Slave，即总线上的全部Slave设备。
+* APB主要用在低速且低功率消耗的IP接口上，协议简单，时钟clock也比较低，通常用作AHB/AXI总线的扩展。
+* 不需要仲裁器
+* 必须在时钟上升沿触发
+* 主要构成
+    - APB Bridge：可以锁存所有的地址、数据和控制信号，并译码产生APB Slave的SEL信号。
+    - APB Slave，即总线上的全部Slave设备。
 
 ![](../assets/apb1.png)
 
@@ -39,38 +46,42 @@ APB总线协议从1998年第一版至今共有4个版本：
 
 具体版本更新图：
 
-<img src="../assets/apb2.png" style="zoom: 67%;" />
+![](../assets/apb2.png)
 
 ### 信号定义
 
-<img src="../assets/apb3.png" style="zoom:80%;" />
+
+![](../assets/apb3.png)
+
 
 ### APB Bridge/Slave
 
-<img src="../assets/apb4.png"  style="zoom: 50%;" />
+![](../assets/apb4.png)
 
-<img src="../assets/apb5.png" alt="blob.png" style="zoom:53%;" />
+
+![](../assets/apb5.png)
 
 ### 状态机
 
-<img src="../assets/apb6.png" style="zoom: 50%;" />
+![](../assets/apb6.png)
 
 状态机：
 
 - IDLE：  APB的默认状态
 - SETUP：当有数据传输申请时，首先进入SETUP阶段，并且此时PSEL会被置为有效。SETUP只会保持一个阶段，然后在下一个Clk posedge就会进入ACCESS阶段。
 - ACCESS：在ACCESS阶段，PENABLE会被置为有效。在SETUP→ACCESS的clk posedge时，address, write, select, and write data signals都会保持有效。 并且此时：
-  - 如果PREDY无效，APB总线会一直保持在ACCESS阶段；
-  - 如果PREADY有效了，则会在该cycle内完成传输，并在下一个阶段：
-    - 如果没有数据继续传输，跳转回IDLE；
-    - 如果有数据传输，跳转回SETUP。
+    + 如果PREDY无效，APB总线会一直保持在ACCESS阶段；
+    + 如果PREADY有效了，则会在该cycle内完成传输，并在下一个阶段：
+        * 如果没有数据继续传输，跳转回IDLE；
+        * 如果有数据传输，跳转回SETUP。
 - **总结：读/写一次，最少需要两个cycle，即SETUP和ACCESS！**
 
 ### 写操作
 
 #### 不带等待的写操作
 
-<img src="../assets/apb7.png" style="zoom:50%;" />
+![](../assets/apb7.png)
+
 
 - 在 T0时，有限状态机进入预设的 IDLE 状态；
 - 在 T1 时，数据地址、读写控制信号和写入的数据会在频率正沿触发时，开始作写的数据传递准备，这个周期也就是刚才所提及SETUP状态。译码电路在此状态会根据数据地址去译码出所要写入APB Slave，此时所对应到 S 的 PSEL 信号将由 0 变 1；
@@ -79,7 +90,7 @@ APB总线协议从1998年第一版至今共有4个版本：
 
 #### 带等待的写操作
 
-<img src="../assets/apb8.png" alt="image-20211023202845648" style="zoom:50%;" />
+![](../assets/apb8.png)
 
 主要的逻辑和不带等待的一致，区别在于：
 
@@ -92,21 +103,24 @@ APB总线协议从1998年第一版至今共有4个版本：
 
 APB4中增加了PSTRB这个信号，用来确定PWDATA中的有效字节。PSTRB的每一位代表一个字节，所以当PSTRB[n]有效时，PWDATA[(8n + 7):(8n)]有效，例如一个32bit位宽的PWDATA：
 
-<img src="../assets/apb9.png" alt="image-20211101160851802" style="zoom:50%;" />
+
+![](../assets/apb9.png)
+
 
 注意在读传输的过程中，PSTRB应该保持为无效（低）。
 
 ### 读操作
 
-#### 不带wait的读操作
+#### 不带等待的读操作
 
-<img src="../assets/apb10.png" alt="image-20211023205253106" style="zoom:50%;" />
+![](../assets/apb10.png)
 
 主要时序逻辑和写操作很像，主要区别在于：在 T2后，也就是在进入 ENABLE 周期后，APB 从必须要将 M 所要读取的数据准备好，以便在 ENABLE 周期末在 T3 时钟上升沿触发时，M 可以正确读取数据。
 
-#### 带wait的读操作
+#### 带等待的读操作
 
-<img src="../assets/apb11.png" alt="image-20211023205524960" style="zoom:50%;" />
+
+![](../assets/apb11.png)
 
 和写类似，可以利用PREADY拉低，代表当前Slave还没准备好。
 
@@ -120,17 +134,18 @@ APB4中增加了PSTRB这个信号，用来确定PWDATA中的有效字节。PSTRB
 
 #### Write Error
 
-<img src="../assets/apb12.png" alt="image-20211023210740594" style="zoom:50%;" />
+
+![](../assets/apb12.png)
 
 #### Read Error
 
-<img src="../assets/apb13.png" alt="image-20211023210755984" style="zoom:50%;" />
+![](../assets/apb13.png)
 
 #### Mapping of PSLVERR
 
 - AXI→APB：APB总线上的PSLVERR信号会被映射到AXI总线上的RRESP或者BRSEP上。
-  - 读映射：PSLVERR → RRESP[1]。
-  - 写映射：PSLVERR → BRESP[1]。
+    + 读映射：PSLVERR → RRESP[1]。
+    + 写映射：PSLVERR → BRESP[1]。
 
 - AHB→APB：读写映射 PSLVERR → HRESP[0]。
 
@@ -138,17 +153,17 @@ APB4中增加了PSTRB这个信号，用来确定PWDATA中的有效字节。PSTRB
 
 APB4中增加了一个信号PPROT[2:0]，用来表示Protection的相关内容。
 
-- PPROT[0]：
-  - Low：normal access
-  - High：Privileged access
-  - 作用：master用来表明当前的进程模式。Privileged access通常在系统中具有更高的访问级别。
-- PPROT[1]：
-  - Low：secure access
-  - High：non-secure access
-- PPROT[2]：
-  - Low：data access
-  - High：instruction access
-  - 作用：此指示作为提示提供，并非在所有情况下都准确。标准建议默认情况下标记为data access，除非明确知道它是指令访问。
+* PPROT[0]：
+    + Low：normal access
+    + High：Privileged access
+    + 作用：master用来表明当前的进程模式。Privileged access通常在系统中具有更高的访问级别。
+* PPROT[1]：
+    + Low：secure access
+    + High：non-secure access
+* PPROT[2]：
+    + Low：data access
+    + High：instruction access
+    + 作用：此指示作为提示提供，并非在所有情况下都准确。标准建议默认情况下标记为data access，除非明确知道它是指令访问。
 
 ## AHB（Advanced High-Performance Bus）总线
 
@@ -167,7 +182,8 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 #### 连接关系
 
-<img src="../assets/ahb1.png"  style="zoom:50%;" />
+
+![](../assets/ahb1.png)
 
 #### Master
 
@@ -177,7 +193,7 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 - 信号控制Command信号组
 - Data+Response信号组
 
-<img src="../assets/ahb2.png"  style="zoom:50%;" />
+![](../assets/ahb2.png)
 
 #### Slave
 
@@ -195,6 +211,7 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 ### 信号定义
 
+
 <img src="../assets/ahb5.png" alt="image-20211113151139044" style="zoom: 33%;" />
 
 <img src="../assets/ahb6.png" alt="image-20211113160937638" style="zoom: 30%;" />
@@ -210,19 +227,19 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 - 首先，Master需要向向Arbiter发送请求。Arbiter根据当前总线的使用情况，决定是否允许该Master占用总线。当Master占用总线后，可以开始执行传输过程。
 
 - 当开始传输后，Master开始传输地址和控制信号。这些信号address、direction、width of the
-  transfer，以及 indication if the transfer forms part of a burst。
+transfer，以及 indication if the transfer forms part of a burst。
 
-  其中有两种传输模式：incrementing bursts和wrapping bursts，前者是正常传输，后者是回卷突发模式，突发传输地址可溢出性递增，突发长度仅支持2,4,8,16。地址空间被划分为长度【突发尺寸*突发长度】的块，传输地址不会超出起始地址所在的块，一旦递增超出，则回到该块的起始地址。 
+其中有两种传输模式：incrementing bursts和wrapping bursts，前者是正常传输，后者是回卷突发模式，突发传输地址可溢出性递增，突发长度仅支持2,4,8,16。地址空间被划分为长度【突发尺寸 * 突发长度】的块，传输地址不会超出起始地址所在的块，一旦递增超出，则回到该块的起始地址。 
 
 - 每次Transfer都包含两个步骤：
 
-  - 地址阶段：一个cycle，用来传输address和control
-  - 数据阶段：一个或多个cycle，用来传输data。（cycle数量由HREADY决定）
+    + 地址阶段：一个cycle，用来传输address和control
+    + 数据阶段：一个或多个cycle，用来传输data。（cycle数量由HREADY决定）
 
 - 每次Transfer，slave可以使用HRESP信号作为给master的response：
-  - OKAY：表明当前传输正常，即当HREADY拉高时，传输完毕。
-  - ERROR：表明当前传输错误，没有成功。
-  - RETRY and SPLIT：表明当前传输不能立即完成，但是仍然需要主机继续尝试传输。
+    + OKAY：表明当前传输正常，即当HREADY拉高时，传输完毕。
+    + ERROR：表明当前传输错误，没有成功。
+    + RETRY and SPLIT：表明当前传输不能立即完成，但是仍然需要主机继续尝试传输。
 
 ### 信号传输过程
 
@@ -231,10 +248,10 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 <img src="../assets/ahb10.png" alt="image-20211114143056831" style="zoom:40%;" />
 
 - 第一个时钟上升沿，主机发送address和control信号；
-  - 第二个时钟上升沿，从机接收address和control信号，如果从机准备好了则HREADY输出有效，否则HREADY输出无效，且当slave准备好了以后再把HREADY拉高；
+    + 第二个时钟上升沿，从机接收address和control信号，如果从机准备好了则HREADY输出有效，否则HREADY输出无效，且当slave准备好了以后再把HREADY拉高；
 - 需要注意的是：
-  - 对于写操作（Master -> Slave）主机一定要在第二个时钟周期内把Data给准备好！在wait状态中，所有的数据都需要保持稳定不变。
-  - 对于读操作（Slave -> Master）从机需要在拉高HREADY的同时，把数据准备好！在wait状态中，slave提供的数据不一定是有效的。
+    + 对于写操作（Master -> Slave）主机一定要在第二个时钟周期内把Data给准备好！在wait状态中，所有的数据都需要保持稳定不变。
+    + 对于读操作（Slave -> Master）从机需要在拉高HREADY的同时，把数据准备好！在wait状态中，slave提供的数据不一定是有效的。
 
 #### 多地址传输
 
@@ -242,10 +259,10 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 ### 传输类型（HTRANS编码）
 
-- 00/IDLE：当主机占用了总线，但并不想进行数据的收发时，传输类型为IDLE，此时Slave必须忽略相关操作，并回OKAY的HRESP。
-- 01/BUSY: 当主机在这次Burst中的本次transfer没有准备好时，就会使用BUSY传输模式；就类似于从机没有准备好，就将HREADY拉低的操作，效果是一样的。只不过一个针对主机，一个针对从机。当从机收到BUSY时，会忽略本次transfer，并回OKAY的HRESP。
-- 10/NONSEQ: brust的第一个transfer的是NONSEQUENTIAL。在总线传输中，signle transfer会被当作brust的第一个signle transfer，所以signle transfer也是NONSEQUENTIAL。
-- 11/SEQ: 每次Burst除第一次transfer以外的其他transfer都是SEQUENTIAL。The address is related to the previous transfer. The control information is identical to the previous transfer. The address is equal to the address of the previous transfer plus the size (in bytes). In the case of a wrapping burst the address of the transfer wraps at the address boundary equal to the size (in bytes) multiplied by the number of beats in the transfer (either 4, 8 or 16).  
+* 00/IDLE：当主机占用了总线，但并不想进行数据的收发时，传输类型为IDLE，此时Slave必须忽略相关操作，并回OKAY的HRESP。
+* 01/BUSY: 当主机在这次Burst中的本次transfer没有准备好时，就会使用BUSY传输模式；就类似于从机没有准备好，就将HREADY拉低的操作，效果是一样的。只不过一个针对主机，一个针对从机。当从机收到BUSY时，会忽略本次transfer，并回OKAY的HRESP。
+* 10/NONSEQ: brust的第一个transfer的是NONSEQUENTIAL。在总线传输中，signle transfer会被当作brust的第一个signle transfer，所以signle transfer也是NONSEQUENTIAL。
+* 11/SEQ: 每次Burst除第一次transfer以外的其他transfer都是SEQUENTIAL。地址与之前的传输有关。控制信息与前一次传输相同。该地址等于前一次传输的地址加上大小(以字节为单位)。在wrapping burst的情况下，传输地址=size乘以transer的beats的数量(either 4, 8 or 16)。In the case of a wrapping burst the address of the transfer wraps at the address boundary equal to the size (in bytes) multiplied by the number of beats in the transfer (either 4, 8 or 16).  
 
 ![image-20211114144748054](../assets/ahb12.png)
 
@@ -258,12 +275,13 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 - AHB协议允许长度为4、8、16以及不定长的burst，也支持single transfer。
 - Burst传输的最大边界不能超过1KB！！
-- Burst中的长度并不是byte的长度，而是传输次数，总的数据长度=brust大小 x HSIZE 。
-
+- Burst中的长度(burst size)并不是byte的长度，而是传输次数(number of beats in the burst)，总的数据长度=brust beats x HSIZE 。
 - AHB协议支持Incrementing和wrapping两种burst模式：
-  - Incrementing：递增的突发访问顺序位置，突发中每次传输的地址只是前一个地址的增量。
-  - wrapping：回卷突发模式，突发传输地址可溢出性递增。地址空间被划分为长度【突发尺寸*突发长度】的块，传输地址不会超出起始地址所在的块，一旦递增超出，则回到该块的起始地址。主要是针对Cache Line的更新使用！
+    + Incrementing：递增的突发访问顺序位置，突发中每次传输的地址只是前一个地址的增量。
+    + wrapping：回卷突发模式，突发传输地址可溢出性递增。地址空间被划分为长度【突发尺寸 * 突发长度】的块，传输地址不会超出起始地址所在的块，一旦递增超出，则回到该块的起始地址。主要是针对Cache Line的更新使用！
+        * For example, a four-beat wrapping burst of word (4-byte) accesses will wrap at 16-byte boundaries. Therefore, if the start address of the transfer is 0x34, then it consists of four transfers to addresses 0x34, 0x38, 0x3C and 0x30
 - Burst的每次transfer都要地址边界对齐！
+    +  For example, word transfers must be aligned to word address boundaries (that is A[1:0] = 00), halfword transfers must be aligned to halfword address boundaries (that is A[0] = 0).
 - HBURST[2:0]的定义：
 
 <img src="../assets/ahb13.png" style="zoom:50%;" />
@@ -292,7 +310,7 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 - HGRANTx：由Arbiter产生，用来表明某一个Master当前拥有请求总线访问的最高优先级。
 
-  注意：再HGRANTx 和 HREADY 为高的HCLK上升沿，Master拥有总线的控制权。
+注意：再HGRANTx 和 HREADY 为高的HCLK上升沿，Master拥有总线的控制权。
 
 - HMASTER[3:0]  ：Arbiter使用HMASTER信号来表明哪个主机当前占用总线，用来控制多路选择器等。
 - HMASTLOCK  ：仲裁器通过断言 HMASTLOCK 信号指示当前传输是一个锁定序列的一部分，该信号和地址以及控制信号有相同的时序。
@@ -329,11 +347,11 @@ AHB总线包括三个部分，分别是主机、从机和Interconnect
 
 - 从Master的角度来说，AHB总线传输总共有三个阶段：bus req、Address、Data，即：
 
-  <img src="../assets/ahb20.png" alt="image-20211115215633941" style="zoom:50%;" />
+<img src="../assets/ahb20.png" alt="image-20211115215633941" style="zoom:50%;" />
 
 - 从Slave的角度来说，AHB总线传输总共有两个阶段：Address和Data：
 
-  <img src="../assets/ahb21.png" style="zoom:50%;" />
+<img src="../assets/ahb21.png" style="zoom:50%;" />
 
 ## AXI总线
 
@@ -383,7 +401,7 @@ A：因为读数据通道中就可以包含了读相应信号。
 
 - 拓扑结构
 
-  ![img](../assets/axi3.png)
+![img](../assets/axi3.png)
 
 ### 信号定义
 
@@ -494,16 +512,16 @@ AXI 是一个 burst-based 协议，AXI 传输事务中的数据传输以 burst �
 
 - AWSIZE[2:0]决定写传输的大小
 
-  | AxSIZE[2:0] | Bytes in transfer |
-  | ----------- | ----------------- |
-  | 0b000       | 1                 |
-  | 0b001       | 2                 |
-  | 0b010       | 4                 |
-  | 0b011       | 8                 |
-  | 0b100       | 16                |
-  | 0b101       | 32                |
-  | 0b110       | 64                |
-  | 0b111       | 128               |
+| AxSIZE[2:0] | Bytes in transfer |
+| ----------- | ----------------- |
+| 0b000       | 1                 |
+| 0b001       | 2                 |
+| 0b010       | 4                 |
+| 0b011       | 8                 |
+| 0b100       | 16                |
+| 0b101       | 32                |
+| 0b110       | 64                |
+| 0b111       | 128               |
 
 ##### Burst类型
 
@@ -528,44 +546,44 @@ AXI 是一个 burst-based 协议，AXI 传输事务中的数据传输以 burst �
 #### 数据读写结构
 
 - Write strobes
-  - WSTRB[n:0]对应于对应的写字节，WSTRB[n]对应WDATA[8n+7:8n]。
-  - WVALID为低时，WSTRB可以为任意值。
-  - WVALID为高时，WSTRB为高的字节线必须指示有效的数据。
+- WSTRB[n:0]对应于对应的写字节，WSTRB[n]对应WDATA[8n+7:8n]。
+- WVALID为低时，WSTRB可以为任意值。
+- WVALID为高时，WSTRB为高的字节线必须指示有效的数据。
 
 - Narrow transfers
 
-  当主机产生比它数据总线要窄的传输时，由地址和控制信号决定哪个字节被传输：
+当主机产生比它数据总线要窄的传输时，由地址和控制信号决定哪个字节被传输：
 
-  - 对于INCR和WRAP，不同的字节线决定每次burst传输的数据。
-  - 对于FIXED，每次传输使用相同的字节线。
-  - 下图给出了5次突发传输，起始地址为0，每次传输为8bit，数据总线为32bit，突发类型为INCR：
+- 对于INCR和WRAP，不同的字节线决定每次burst传输的数据。
+- 对于FIXED，每次传输使用相同的字节线。
+- 下图给出了5次突发传输，起始地址为0，每次传输为8bit，数据总线为32bit，突发类型为INCR：
 
-  <img src="../assets/axi18.png" alt="image-20211116201824813" style="zoom:50%;" />
+<img src="../assets/axi18.png" alt="image-20211116201824813" style="zoom:50%;" />
 
-  - 下图给出3次突发，起始地址为4，每次传输32bit，数据总线为64bit：、
+- 下图给出3次突发，起始地址为4，每次传输32bit，数据总线为64bit：、
 
-    <img src="../assets/axi19.png" alt="image-20211116202129553" style="zoom:50%;" />
+<img src="../assets/axi19.png" alt="image-20211116202129553" style="zoom:50%;" />
 
 - Unaligned transfers 非对齐传输
 
-  - AXI支持非对齐传输。在大于一个字节的传输中，第一个自己的传输可能是非对齐的。如32-bit数据包起始地址在0x1002，非32bit对齐。
+- AXI支持非对齐传输。在大于一个字节的传输中，第一个自己的传输可能是非对齐的。如32-bit数据包起始地址在0x1002，非32bit对齐。
 
-  - 主机可以：
+- 主机可以：
 
-    - 即使起始地址非对齐，也保证**所有传输是对齐**的
-    - 在首个 transfer 中增加填充数据，**将首次传输填充至对齐**，填充数据使用 WSTRB 信号标记为无效
+- 即使起始地址非对齐，也保证**所有传输是对齐**的
+- 在首个 transfer 中增加填充数据，**将首次传输填充至对齐**，填充数据使用 WSTRB 信号标记为无效
 
-  - 对齐非对齐传输32bit总线示例：
+- 对齐非对齐传输32bit总线示例：
 
-    <img src="../assets/axi20.png" style="zoom:50%;" />
+<img src="../assets/axi20.png" style="zoom:50%;" />
 
-  - 对齐非对齐传输64bit总线示例：
+- 对齐非对齐传输64bit总线示例：
 
-    <img src="../assets/axi21.png" style="zoom:50%;" />
+<img src="../assets/axi21.png" style="zoom:50%;" />
 
-  - 非对齐的Wrapping传输64bit总线示例：
+- 非对齐的Wrapping传输64bit总线示例：
 
-    <img src="../assets/axi22.png" style="zoom:50%;" />
+<img src="../assets/axi22.png" style="zoom:50%;" />
 
 #### 读写响应结构
 
