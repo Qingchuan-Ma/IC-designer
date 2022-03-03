@@ -77,3 +77,53 @@
 ![](../assets/cache0.png)
 
 ## Replacement Policies
+
+When a new line is to be inserted into the cache, which line should be evicted to make space for the new line
+
+Belady’s policy: it evicts the line that will be re-used furthest in the future
+
+### Taxonomy
+
+* Coarse-Grained policies, treat all lines identically when they are inserted into the cache and only differentiate among lines based on their their behavior while they reside in the cache. 
+* Fine-Grained policies distinguish among lines when they are inserted into the cache (in addition to observing their behavior while they reside in the cache).
+
+* Insertion Policy: How does the replacement policy initialize the replacement state of a new line when it is inserted into the cache?
+* Promotion Policy: How does the replacement policy update the replacement state of a line when it hits in the cache?
+* Aging Policy: How does the replacement policy update the replacement state of a line when a competing line is inserted or promoted?
+* Eviction Policy: Given a fixed number of choices, which line does the replacement policy evict?
+
+* Coarse-Grained policies (insertion一视同仁)
+    - Recency-Based Policies
+        + fixed lifetime
+        + extended lifetime
+    - Frequency-BasedPolicies
+    - Hybrid Policies
+* Fine-Grained policies (smarter insertion policy)
+    - Classification-Based Policies
+        + cache-friendly
+        + cache-averse
+    - Reuse Distance-Based Policies
+
+The primary goal of replacement policies is to increase cache hit rates, and many design factors contribute toward achieving a higher hit rate. We outline three such factors as follows：
+
+* Granularity: inserstion是否使用过去数据还是一视同仁
+* History: 需要使用多少过去数据
+* Access Patterns: 替换策略对某些访问模式的专门化程度如何?它对访问模式的更改或不同访问模式的混合是否健壮?
+
+
+### Coarse-Grained policies
+
+three commonlu observed cache access patterns:
+* recency-friendly accesses: working set small enough to fit cache size
+* thrashing accesses: working set bigger than cache size
+* scans: never repeat
+
+#### RECENCY-BASED POLICIES
+
+* LRU
+* MRU
+* EELRU: 跟踪Recency链表的命中次数，如果分布单调递减，认为没有thrash，反之有
+* Seg-LRU
+
+
+LIP

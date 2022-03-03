@@ -116,7 +116,7 @@ MTBF 影响了哪些跨时钟域的设计细节：
 
 * 读这边判空
 * 写这边判满
-* 空和满都是悲观推测的，因为在同步的时候，可能已经不是空或者满了
+* 空和满都是悲观推测的，因为在同步结束的时候，可能已经不是空或者满了
 * reset都是采用的asynchronously set and synchronously removed （就是异步复位同步释放）
 * almost-empty 和 almost-full 可以用 bin+N 的 gray码与指针比较
 
