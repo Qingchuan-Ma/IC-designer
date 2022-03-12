@@ -411,27 +411,27 @@ A：因为读数据通道中就可以包含了读相应信号。
 
 #### 写地址通道信号
 
-![image-20211116150104800](../assets/axi5.png)
+![](../assets/axi5.png)
 
 #### 写数据通道信号
 
-![image-20211116150521222](../assets/axi6.png)
+![](../assets/axi6.png)
 
 #### 写返回通道信号
 
-![image-20211116150533755](../assets/axi7.png)
+![](../assets/axi7.png)
 
 #### 读地址通道信号
 
-![image-20211116150614086](../assets/axi8.png)
+![](../assets/axi8.png)
 
 #### 读数据通道信号
 
-![image-20211116150721824](../assets/axi9.png)
+![](../assets/axi9.png)
 
 #### 低功耗接口信号
 
-![image-20211116150856711](../assets/axi10.png)
+![](../assets/axi10.png)
 
 ### 读写握手
 
