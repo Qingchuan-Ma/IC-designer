@@ -10,8 +10,8 @@
 * write-buffer: 两种都需要
 * miss rate
     - compulsory
-    - capacity
-    - conflict
+    - capacity: set 不够
+    - conflict: line 不够
     - coherency
 * Average memory access time = Hit time + Miss rate * Miss penalty
 * six basic cache optimizations
@@ -42,9 +42,10 @@
         + 更深的流水线，缩短了时钟周期、提高带宽；代价increased latency 和分支预测的greater penalty
         + sequential interleaving
     - Nonblocking Caches to Increase Cache Bandwidth
+        + nonblocking cache or lockup-free cache
         + 非阻塞：甚至容忍多重缺失
         + 决定支持多少个未处理缺失(outstanding misses)，需要考虑多重因素
-            * miss 的时间和空间局域性，决定了一次缺失会除法多少次对下级的新访问
+            * miss 的时间和空间局域性，决定了一次缺失会触发多少次对下级的新访问
             * 对访问请求作出回应的存储器或缓存的带宽
             * 为了允许在最低级别的缓存中出现更多的未处理缺失(miss time 最长)，需要在较高级别上支持至少数目相等的缺失，这是因为这些缺失必须在最高级别缓存上启动
             * 存储器系统的延迟
@@ -75,6 +76,28 @@
         + two full DRAM accesses: one to get the initial tag and a follow-on access to the main memory
 
 ![](../assets/cache0.png)
+
+### Non-blocking cache implementation
+
+两个挑战：
+
+* 在命中和未命中之间进行仲裁
+    - 命中可能会与从内存层次结构的下一层返回的未命中发生碰撞，所以需要解析碰撞
+        + 可以设置hit的优先级比miss高
+        + ordering colliding misses
+* 跟踪未完成的miss，以便我们知道何时可以进行装载或存储
+    - miss的返回可能不是按miss之间的顺序返回的，有些可能返回更早
+    - 当一个miss返回时
+        + 处理器必须知道那个load和store导致了miss
+        + 必须知道数据应该放在哪里
+    - 最近的处理器保存在a set of registers (Miss Status Handling Registers(MSHRs))
+        + 如果我们允许n个outstanding misses，就有n个MSHR，每一个MSHR保存这个miss要去cache的那个位置以及tag位，还要表明哪个load或store导致这个miss
+        + 全相联的方式组织所有MSHR，如果第二次miss，发现tag相同，说明二次miss就不再分配MSHR，而是在load miss queue和store miss queue分配一个入口，达到多个miss合并
+        + 当miss发生，分配一个MSHR来处理这个miss，记录miss信息，把内存请求和MSHR的index挂钩
+        + 内存系统返回数据的时候使用这个MSHR的信息将数据送到合适的block然后通知load和store数据已经可用
+* 其他的问题
+    - 多核情况下的内存系统的一致性模型和缓存一致性问题
+    - cache miss不再是原子，因此可能导致死锁
 
 ## Replacement Policies
 

@@ -20,6 +20,12 @@ A good memory consistency model should possess Sarita Adve’s 3Ps plus our four
 * Portability: A good model would be adopted widely or at least provide backward compatibility or the ability to translate among models.
 * Precision: A good model should be precisely defined, usually with mathematics. Natural languages are too ambiguous to enable experts to push the envelope of what is allowed.
 
+
+## Strict Consistency
+
+一个hard thread对于数据项x的任何读操作将返回最近一次此hart对x进行写操作的结果所对应的值。
+
+
 ## Sequential Consistency (SC)
 
 ### FORMALISM
@@ -190,7 +196,8 @@ B表示bypassing，A表示same address要强制顺序
 
 The reorder units obey rules for (1) FENCEs, (2) operations to the same address, and
 (3) bypassing:
-1. 不管地址想不想同，不能reorder: Load->FENCE, Store->FENCE, FENCE->FENCE, FENCE->Load, or FENCE->Store
+
+1. 不管地址相不相同，不能reorder: Load->FENCE, Store->FENCE, FENCE->FENCE, FENCE->Load, or FENCE->Store
 2. 对于相同地址，不能reorder: Load->Load, Load->Store, Store->Store
 3. reorder unit必须保证load能够立即看到他们自己store后的更新值
 
@@ -234,6 +241,7 @@ DRF要求多线程程序中不能有冲突的操作。用于提供给程序员�
 在XC中，Acquire只需要一个后置的FENCE，Release只需要一个前置的FENCE。但实际上，还可以更激进一些，让临界区FENCE之前的Store和Load在改FENCE之后运行也没有关系，反之在临界区FENCE之后的Store和Load在改FENCE之前运行也没有关系。
 
 RC提供ACQUIRE和RELEASE两个操作类似于FENCE，然是只限定一个方向，而不是像FENCE一样指定两个方向。
+
 * ACQUIRE -> Load, Store (不强求 Load, Store -> ACQUIRE)
 * Load, Store -> RELEASE (不强求 RELEASE -> Load, Store)
 * ACQUIRE 和 RELEASE 则是SC顺序：
@@ -303,6 +311,18 @@ XC两者都满足，XC is write atomic by definition since its memory order (< m
 暂略
 
 
+
+## Processor Consistency
+
+在单一一个处理器上完成的所有写操作，将会被以它实际发生的顺序通知给所有其它的处理器，但是在不同处理器上完成的写操作也许会被其它不同的处理器以不同于它实际执行的顺序所看到。基本的想法是“处理器一致性“可以更好的反映真实的网络 — 网络中不同节点的延迟可能是不相同的。
+
+
+wherein a core’s stores reach other cores in order but do not necessarily reach other cores at the same "time".
+
+
 ## Reference
 
 S. V. Adve and K. Gharachorloo. Shared memory consistency models: A tutorial. IEEE Computer, 29(12):66–76, December 1996. 
+
+Gharachorloo, K., D. Lenoski, J. Ludon, P. Gibbons, A. Gupta, and J. Hennessy, “Memory consistency and event ordering in scalable shared-memory multiprocessors,” in Proceedings of the 17th International Symposium on Computer Architecture (1990) 15-26
+

@@ -1,6 +1,6 @@
 # Coherence (Cache Coherence)
 
-多个actor对一个数据的多分copy的访问权限，并且其中一个访问是写访问。
+多个actor对一个数据的多份copy的访问权限，并且其中一个访问是写访问。
 
 actor: cores/DMA engine/external device(能够访问内存或者cache)
 
@@ -58,7 +58,7 @@ writes to the same memory location are serialized (safety invariant)
 
 #### Block Characteristics:
 
-* Validity: 可以读，然是终止有也exclusive的时候才可以被写
+* Validity: 可以读，但是同时有也exclusive的时候才可以被写
 * Dirtiness: 是最新但是和LLC/memory里的值不一样，cache controller负责最终更新LLC/memory里的值
 * Exclusivity: 私有copy
 * Ownership: 如果负责处理request，cache controller或者memory controller就是其owner

@@ -1,5 +1,7 @@
 # ILP
 
+amdahl定律：加速比=1/[(1-a)+a/k],k为并行带来的提升比例，a为可以并行的部分
+
 ![](../assets/pipeline2.png)
 
 Pipeline CPI = Ideal pipeline CPI + Structural stalls + Data hazard stalls + Control stalls
@@ -81,7 +83,7 @@ tagged hybrid predictor:
             * 存储多次跳转
             * Branch folding is a technique where, on the prediction of most branches, the branch instruction is completely removed from the instruction stream presented to the execution pipeline
     - RAS return address stack
-        + 目的：剑姬诶跳转，指那些跳转地址会变化的，大多数都是函数的返回操作，尽管可以用BTB预测，但是调用地方分散，预测准确性会很低
+        + 目的：间接跳转，指那些跳转地址会变化的，大多数都是函数的返回操作，尽管可以用BTB预测，但是调用地方分散，预测准确性会很低
         + 当执行函数调用(call)时，将函数返回地址(Return Address)入栈
         + 当函数返回(return)时，直接从栈中弹出地址进行取指令
         + riscv-spec中还明确了RAS的push/pop条件与规范
@@ -446,7 +448,7 @@ Speedup = Pipeline depth / (1 + Pipeline stall cycles per instruction)
 
 * tomasulo优势
     - 冒险检测逻辑的分布
-        + 分布式保留站和CDB广播；如果使用集中的寄存器堆，这些但云必须在寄存器总线可用时才可以读结果
+        + 分布式保留站和CDB广播；如果使用集中的寄存器堆，必须在寄存器总线可用时才可以读结果
     - 消除了WAW和WAR
         + 通过保留站重命名寄存器，并在操作数可以用时立刻存储在保留站
 * 存储器访问的冒险
@@ -626,3 +628,8 @@ In reality, however, the value to be stored need not arrive until just before th
         
 
 
+## OITF
+
+* Outstanding Intructions Track FIFO (OITF)
+
+OITF 和 ROB 功能类似

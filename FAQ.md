@@ -201,16 +201,20 @@ A: design rule check, 包括max_transition, max_fanout, max_area, max_capacitanc
 ```
 Q: Dmux如何实现多位宽信号同步
 
-A: 将多Bit数据信号和单bit控制信号成对的从发送时钟域发往接受时钟域，控制信号在接收时钟域以两级同步器（打两拍）的形式接收，多Bit数据信号由同步后的单Bit控制信号控制的MUX决定数据是否通过。Dmux就是max
+A: 将多Bit数据信号和单bit控制信号成对的从发送时钟域发往接受时钟域，控制信号在接收时钟域以两级同步器（打两拍）的形式接收，多Bit数据信号由同步后的单Bit控制信号控制的MUX决定数据是否通过。Dmux就是mux
 ```
+
+
 
 ```
 Q: 常见的握手协议有什么
 
 A: 
-异步两相, 四相握手协议
+异步四相,两相握手协议
 ready valid握手协议
 ```
+
+![](./assets/handshake.png)
 
 ```
 Q: 阻塞赋值和非阻塞赋值
@@ -258,6 +262,9 @@ Q: xdma.png的IP框架
 A: 
 ```
 
+![](./assets/xdma.png)
+
+
 ```
 Q: 统计输入[7:0]data_in中1的个数，要求优化资源的使用
 
@@ -267,7 +274,6 @@ speed: sigma_data[i]
 
 ```
 
-![](./assets/xdma.png)
 
 ```
 Q: 补码的意义是什么
@@ -313,8 +319,8 @@ Q: APB有那些信号
 
 A:
 PCLK, PRESETn
-Bridge: PADDR, PPROT, 
-Slave:
+Bridge: PADDR, PPROT, PWRITE, PADDR, PWDATA, PENABLE(penable为0的时候pready无所谓), PSEL
+Slave: PSELx, PENABLE, PADDR, PWRITE, PWDATA, PRDATA
 ```
 
 ```
@@ -421,8 +427,8 @@ Pin-to-pin Delay，路径延时：用专用块说明每一个路径pin-to-pin延
 ```
 Q: FPGA的LUT
 
-A：LUT是通过查表方式实现的，一个四输入的LUT就是一个16位的RAM，因为四输入的信号最多只有16种组合，每一种组合对应一种输出，就像给这个RAM一个地址一样。
-所以XILINX的四输入LUT是可以配置成一个16位的RAM的，所谓分布式RAM就是拿一些LUT组合成你所需大小的RAM。这种存储器适合小块的RAM，是对BLOCK　RAM的一个很好补充。
+A：LUT是通过查表方式实现的，一个四输入的LUT就是一个16 * 1的RAM，因为四输入的信号最多只有16 * 1种组合，每一种组合对应一种输出，就像给这个RAM一个地址一样。
+所以XILINX的四输入LUT是可以配置成一个16 * 1的RAM的，所谓分布式RAM就是拿一些LUT组合成你所需大小的RAM。这种存储器适合小块的RAM，是对BLOCK　RAM的一个很好补充。
 ```
 
 ```
@@ -513,4 +519,123 @@ A: ~clock时钟沿的latch + enable + and gate(与clock gate)
 Q: 门控电源实现
 
 A: 在Vdd侧搞一个高阈值的pmos管，在standby的时候上边不导通，电源被gate掉了
+```
+
+```
+Q: C910的特点
+```
+
+![](./assets/c910.png)
+
+```
+Q: AXI ID作用
+
+A: 
+1. 为了ordering model，outstanding特性
+2. interconnect添加用于表明master
+
+```
+
+
+```
+Q: 如何使用false path
+
+A: 
+跨时钟域的sdc
+同步释放的异步复位信号
+```
+
+
+```
+Q: gray码的sdc
+
+A: set max/min_delay
+```
+
+```
+Q: moore和mealy状态机的区别
+
+A: 
+moore只跟状态有关
+mealy跟输入和状态都有关
+```
+
+```
+Q: non-blocking cache如何实现
+
+```
+A: [见ilp](./part4/cache.md)
+
+```
+Q: RV中的atomic实现指令有那些，为什么需要多种
+
+A: 
+1. CAS受到ABA问题的困扰，而LR/SC避免了这一点，因为它监视到地址的所有写操作，而不是唯一的检查数据值的变化
+2. CAS还需要一种新的整数指令格式来支持三个源操作数(地址、比较值、交换值)以及一种不同的内存系统消息格式，这将使微架构复杂化;
+3. 此外，为了避免ABA问题，其他系统提供了一个双宽CAS (DW-CAS)，允许计数器被测试，并随着一个数据字而增加。这需要读取5个寄存器，并在一条指令中写入2个寄存器，还需要一个新的更大的内存系统消息类型，使实现更加复杂;
+4. LR / SC提供了一个更高效的实现的原语,因为它只需要一个负载。CAS需要两个（one load before the CAS instruction to obtain a value for speculative computation, then a second load as part of the CAS instruction to check if value is unchanged before updating）
+
+LR/SC的缺点：可能有活锁的问题。通过一种架构上保证eventual forward progress来避免
+```
+
+```
+Q: 什么是ABA问题
+
+A： 
+CAS：对于内存中的某一个值V，提供一个旧值A和一个新值B。如果提供的旧值V和A相等就把B写入V。这个过程是原子性的。
+
+CAS执行结果要么成功要么失败，对于失败的情形下一班采用不断重试。或者放弃。
+
+ABA：如果另一个线程修改V值假设原来是A，先修改成B，再修改回成A。当前线程的CAS操作无法分辨当前V值是否发生过变化。
+```
+
+```
+Q: RV mscratch是干嘛的
+
+A: 上下文栈地址
+```
+
+```
+Q: RVG
+
+A: IMAFDZifenceZicsr
+```
+
+```
+Q: RV中call
+
+A: 
+auipc rd, offsetHi
+jalr x1, offsetLo(rd)
+```
+
+```
+Q: ret
+
+A: jalr x0, 0(x1)
+```
+
+```
+Q: 如何分辨call 和 jalr
+
+A: 
+
+一个JAL指令当且仅当rd是x1或x5时push return address到RAS，认为是一个call
+
+JALR指令
+* rd不是x1/x5, rs1是x1/x5, pop RAS，认为是一个return
+* rd是x1/x5, rs1不是1x/x5, push RAS, 认为是call
+* rd是x1/x5, rs1是x1/x5，rd!=rs1, pop然后push
+* rd是x1/x5, rs1是x1/x5，rd=rs1, push RAS, 认为是call
+
+
+```
+
+```
+Q: jal的imm20的为什么乱七八糟的
+
+A: 
+
+ 改组的目的是减少从不同指令类型的中间体构造全尺寸操作数所涉及的多路复用器的数量。  
+ 例如，符号扩展位（驱动很多线）总是相同的（inst [31]）。 您还可以看到imm [10]在I-type，S-type，B-type和J-type指令中几乎总是在同一个地方。 
 ```

@@ -5,7 +5,7 @@
 
 * 功能指标定义
 * 架构设计
-* 详细设计
+* RTL设计
 * 功能验证（前仿）
 * 逻辑综合、优化
     -  translation + optimization + mapping
@@ -85,6 +85,9 @@ Backend design flow ：
 * Route
 * Wirte_bitstream
 
+## 门
+
+![](../assets/xor.webp)
 
 ## 锁存器
 
@@ -94,6 +97,7 @@ Backend design flow ：
 SR Latch: Set-Rest Latch
 
 2个或非门互联，R对应Q
+
 2个与非门前加上非门，'S对应Q
 
 | S | R | Qnext |
@@ -138,7 +142,12 @@ Qnext = 'RQ + 'RS + RS'Q
 
 两个SR Latch组成的，可以上升沿触发（clock在下降沿触发的基础上再翻转即可），也可以下降沿触发。
 
+![](../assets/sr.jpeg)
+
 但是必须限制输入逻辑是无冒险的电路，主从D触发器让S和R互补消除了1捕获问题
+
+Qn = Sn + Rn'Qn-1
+必须满足RnSn = 0，否则会出现不确定
 
 ### 主从D触发器
 
@@ -202,8 +211,18 @@ Aperture is the sum of setup and hold time. The data input should be held steady
 
 Recovery time is the minimum amount of time the asynchronous set or reset input should be inactive before the clock event, so that the data is reliably sampled by the clock. The recovery time for the asynchronous set or reset input is thereby similar to the setup time for the data input.
 
-Removal time is the minimum amount of time the asynchronous set or reset input should be inactive after the clock event, so that the data is reliably sampled by the clock. The removal time for the asynchronous set or reset input is thereby similar to the hold time for the data input.
+Removal time is the minimum amount of time the asynchronous set or reset input should be inactive after the clock event, so that the data is reliably sampled by the clock. The removal time for the asynchronous set or reset input is theeby similar to the hold time for the data input.
 
+
+恢复时间（Recovery Time）是指异步控制信号（如寄存器的异步清除和置位控制信号）在“下个时钟沿”来临之前变无效的最小时间长度。这个时间的意义是，如果保证不了这个最小恢复时间，也就是说这个异步控制信号的解除与“下个时钟沿”离得太近（但在这个时钟沿之前），没有给寄存器留有足够时间来恢复至正常状态，那么就不能保证“下个时钟沿”能正常作用，也就是说这个“时钟沿”可能会失效。
+
+
+解除时间（Removal Time）是指异步控制信号（如寄存器的异步清除和置位控制信号）在“有效时钟沿”之后变无效的最小时间长度。这个时间的意义是，如果保证不了这个去除时间，也就是说这个异步控制信号的解除与“有效时钟沿”离得太近（但在这个时钟沿之后），那么就不能保证有效地屏蔽这个“时钟沿”，也就是说这个“时钟沿”可能会起作用。
+
+换句话来说，如果你想让某个时钟沿起作用，那么你就应该在“恢复时间”之前是异步控制信号变无效，如果你想让某个时钟沿不起作用，那么你就应该在“解除时间”过后使控制信号变无效。如果你的控制信号在这两种情况之间，那么就没法确定时钟沿是否起作用或不起作用了，也就是说可能会造成寄存器处于不确定的状态。而这些情况是应该避免的。所以恢复时间和去除时间是应该遵守的。
+
+1. 不满足复位恢复时间或者撤离时间，可能会导致亚稳态问题。（注意是可能）因为如果输出本身就是复位后的值，即使当前时钟沿不能判断是否复位，输出也是复位值，这时候就不会产生亚稳态，因为已经是复位态了。
+2. 不满足复位恢复时间或者撤离时间可能会导致不同FF复位状态不一致的问题。复位信号和时钟信号一样，通过 复位网络到达各个触发器。复位网络具有非常大的扇出和负载，到达不同的触发器存在不同的延时，不满足复位恢复或者解除时间的情况下，就有可能在不同的触发器的不同时钟周期内进行解复位。注意，这里的假设条件是复位树和时钟树已经做成立平衡状态，不再考虑复位树和时钟树没做好的情况
 
 ## 基础数字电路
 
@@ -424,3 +443,211 @@ function automatic logic is_onehot(input [WIDTH-1:0] sig);
 endfunction
 
 ```
+
+## LFSR(线性反馈移位寄存器)
+
+* 用于产生可重复的为随机序列PRBS。n个触发器可以产生最大周期为2^n-1的伪随机序列。
+* The bits in the LFSR state that influence the input are called taps（抽头）.
+* gn为反馈系数，取值只能为0或1，取为0时表明不存在该反馈之路，取为1时表明存在该反馈之路
+* 反馈系数决定了产生随机数的算法的不同。
+* 用反馈函数表示成y=a0x^0+a1x+a2x^2.......反馈函数为线性的叫线性移位反馈序列，否则叫非线性反馈移位序列。
+* 这个抽头序列构成的多项式加1就是其反馈多项式，下边两个例子都是 x^16+x^14+x^13+x^11+1
+* LFSR最长当且反馈多项式为本原多项式primitive，下面是必要条件，但是不充分
+    - 抽头个数是偶数
+    - 除了1以外没有公约数
+
+Fibonacci LFSR：
+
+* 多到一型LFSR
+* 抽头序列对应bit位置的多个触发器的输出通过异或逻辑来驱动一个触发器的输入
+* 右边是输出
+
+![](../assets/lfsr1.png)
+
+Galois LFSR：
+
+* 一到多型LFSR，一个触发器的输出通过异或逻辑驱动多个触发器的输入
+* 最后一个触发器的输出通过与抽头序列对应位置触发器前一级触发器的输出异或逻辑驱动多个抽头序列对应位置触发器的输入。
+* 右边是输出
+* 也有反过来的，这个多项式按多数人理解应该是x^16+x^5+x^3+x^2+1,(本原多项式的倒数也是本原多项式)
+
+![](../assets/lfsr2.png)
+
+* 虽然这两种电路都产生伪随机序列，但是一到多型的伽罗瓦LFSR具有更高的速度，因为它的两个触发器之间仅使用一个异或门。
+* 避免寄存器进入全为0的禁止态
+    - 用额外的电路让寄存器能够从禁止状态自动进入允许状态
+    - 想办法给寄存器置位到某个允许的状态
+* 应用
+    - 计数器，地址计数器提供顺序地址，但是没有必要是传统的二进制地址序列，任何重复的序列都是可以接受的，而LFSR计数器是最有效的
+    - BIST，encryption, checksum, PRBS, Pattern Generators
+    - 扰码解码
+
+### 扰码解码
+
+* 并行：8倍频串行扰码
+* 正常工作要点：
+    - 扰码和解码都需要正确初始化
+    - 没有数据的时候LFSR应该要被暂停更新，或者在数据流添加SKIP字符，这个时候不需要扰码解码处理
+    - 也有data正常数据但是LFSR被更新，但是LFSR输出的数据不使用的情况
+
+
+## 检错纠错
+
+
+* 校验：
+    - 奇偶校验
+    - CRC校验
+* 纠错：
+    - 纠错编码
+        + 块状编码
+            * 非线性码
+            * 线性码
+                - 重复码
+                - 奇偶校验位
+                    + LDPC
+                - 汉明码
+                - 循环码
+                    + BCH
+        + 卷积编码（编码不仅与当前输入有关，还跟此前输入有关）
+        
+### 汉明码
+
+
+(7,4)汉明码：4bit数据，3bit冗余
+
+* 计算校验位数
+    - 假设用N表示添加了校验码位后整个信息的二进制位数，用K代表其中有效信息位数，r表示添加的校验码位，它们之间的关系应满足：N=K＋r≤2^r－1
+* 确定校验码位置
+    - 2^n位置，如1，2，4...
+* 确定校验码
+    - p1（第1个校验位，也是整个码字的第1位）的校验规则是：从当前位数起，校验1位，然后跳过1位，再校验1位，再跳过1位，……。这样就可得出p1校验码位可以校验的码字位包括：第1位（也就是p1本身）、第3位、第5位、第7位、第9位、第11位、第13位、第15位，……。然后根据所采用的是奇校验，还是偶校验，最终可以确定该校验位的值。
+    - p2（第2个校验位，也是整个码字的第2位）的校验规则是：从当前位数起，连续校验2位，然后跳过2位，再连续校验2位，再跳过2位，……。这样就可得出p2校验码位可以校验的码字位包括：第2位（也就是p2本身）、第3位，第6位、第7位，第10位、第11位，第14位、第15位，……。同样根据所采用的是奇校验，还是偶校验，最终可以确定该校验位的值。
+    - p3（第3个校验位，也是整个码字的第4位）的校验规则是：从当前位数起，连续校验4位，然后跳过4位，再连续校验4位，再跳过4位，……。这样就可得出p4校验码位可以校验的码字位包括：第4位（也就是p4本身）、第5位、第6位、第7位，第12位、第13位、第14位、第15位，第20位、第21位、第22位、第23位，……。同样根据所采用的是奇校验，还是偶校验，最终可以确定该校验位的值。
+    - p4（第4个校验位，也是整个码字的第8位）的校验规则是：从当前位数起，连续校验8位，然后跳过8位，再连续校验8位，再跳过8位，……。这样就可得出p4校验码位可以校验的码字位包括：第8位（也就是p4本身）、第9位、第10位、第11位、第12位、第13位、第14位、第15位，第24位、第25位、第26位、第27位、第28位、第29位、第30位、第31位，……。同样根据所采用的是奇校验，还是偶校验，最终可以确定该校验位的值。
+* 实现校验
+    - 如果最终发现只是一个校验组中的校验结果不符，则直接可以知道是对应校验组中的校验码在传输过程中出现了差错。
+    - 对应的校验组进行异或运算
+        + 偶校验下，结果应该是0
+        + 奇校验下，结果应该是1
+* 实现纠错
+    - 任何一位数被多个校验位校验，一旦有一个出错，则肯定影响很多个校验位。
+    - 所有校验码组成Pn...P1，在偶校验情况下，如果为0，说明没有错误，如果为n，说明第n位错了
+
+
+![](../assets/hmm1.gif)
+
+![](../assets/hmm2.gif)
+
+### CRC
+
+一个完整的CRC参数模型应该包含以下信息：WIDTH，POLY，INIT，REFIN，REFOUT，XOROUT。
+
+* NAME：参数模型名称。
+* WIDTH：宽度，即生成的CRC数据位宽，如CRC-8，生成的CRC为8位
+* POLY：十六进制多项式，省略最高位1，如 x8 + x2 + x + 1，二进制为1 0000 0111，省略最高位1，转换为十六进制为0x07。
+* INIT：CRC初始值，和WIDTH位宽一致。
+* REFIN：true或false，在进行计算之前，原始数据是否翻转，如原始数据：0x34 = 0011 0100，如果REFIN为true，进行翻转之后为0010 1100 = 0x2c
+* REFOUT：true或false，运算完成之后，得到的CRC值是否进行翻转，如计算得到的CRC值：0x97 = 1001 0111，如果REFOUT为true，进行翻转之后为11101001 = 0xE9。
+* XOROUT：计算结果与此参数进行异或运算后得到最终的CRC值，和WIDTH位宽一致。
+
+通常如果只给了一个多项式，其他的没有说明则：INIT=0x00，REFIN=false，REFOUT=false，XOROUT=0x00。
+
+
+例子：原始数据：0x34，使用CRC-8/MAXIN参数模型，求CRC值？
+```
+POLY = 0x31 = 0011 0001(最高位1已经省略)
+INIT = 0x00
+XOROUT = 0x00
+REFIN = TRUE
+REFOUT = TRUE
+```
+
+```
+0.原始数据 = 0x34 = 0011 0100，多项式 = 0x31 = 1 0011 0001
+1.INIT = 00，原始数据高8位和初始值进行异或运算保持不变。
+2.REFIN为TRUE，需要先对原始数据进行翻转：0011 0100 > 0010 1100
+3.原始数据左移8位，即后面补8个0：0010 1100 0000 0000
+4.把处理之后的数据和多项式进行模2除法，求得余数：
+原始数据：0010 1100 0000 0000 = 10 1100 0000 0000
+多项式：1 0011 0001
+模2除法取余数低8位：1111 1011
+5.与XOROUT进行异或，1111 1011 xor 0000 0000 = 1111 1011 
+6.因为REFOUT为TRUE，对结果进行翻转得到最终的CRC-8值：1101 1111 = 0xDF
+7.数据+CRC：0011 0100 1101 1111 = 34DF，相当于原始数据左移8位+余数。
+```
+
+校验办法：
+
+* 接受到的数据和CRC分离，然后本地进行CRC运算，然后比较，如果一致，说明正确
+* 整个数据帧进行CRC运算，如果余数为0，说明正确
+
+
+#### 串行硬件实现
+
+G(x) = x^4 +x^2 + 1    ->  10101
+
+![](../assets/crc0.webp)
+
+* 初始值假设为0
+* 前4个周期进数据
+* 后4个周期进行模2除法，x3为1说明对10101进行异或
+* 做完之后寄存器的值为校验结果，X3的输出序列为商
+
+
+![](../assets/crc1.webp)
+
+
+* 初始值假设为0
+* 4个周期直接计算出结果
+* 输入为1，说明之后的第2个和第4周期需要和输入值进行异或，因此x2和x0需要赋1
+* 如果在需要异或的时候又来了个1，则说明需要做两次除法，相当对后续数据不做除法
+* 做完之后寄存器的值为校验结果，X3的输出序列为商
+
+#### 并行硬件实现
+
+可以递归推到CRC寄存器的值，在 www.easics.com 中可以查到递归公式和verilog代码
+
+M位宽的并行数据，我们可以根据移位前的N位寄存器值和M位并行数据的位宽数据做逻辑运算计算出（N+1）阶的CRC值
+
+## 8b/10b编码
+
+ 8bit原始数据可以分成两部分：低位的5bit EDCBA（设其十进制数值为X）和高位的3bit HGF（设其十进制数值为Y），则该8bit数据可以记为D.X.Y。另外，8B/10B编码中还用到12个控制字符，他们可以作为传输中帧起始、帧结束、传输空闲等状态标识，与数据字符的记法类似，控制字符一般记为K.X.Y。8bit数据有256种，加上12种控制字符，总共有268种。10bit数据有1024种，可以从中选择出一部分表示8bit数据，所选的码型中0和1的个数应尽量相等。8B/10B编码中将K28.1、K28.5和K28.7作为K码的控制字符，称为“comma”。在任意数据组合中，comma只作为控制字符出现，而在数据负荷部分不会出现，因此可以用comma字符指示帧的开始和结束标志，或始终修正和数据流对齐的控制字符。
+
+ 编码时，低5bit原数据 EDCBA经过5B/6B编码成为6bit码abcdei，高3bit原数据HGF经3B/4B成为4bit码fghj，最后再将两部分组合起来形成一个10bit码abcdeifghj。10B码在发送时，按照先发送低位在发送高位的顺序发送。
+
+ 5B/6B编码和3B/4B编码的映射有标准化的表格，可以通过基于查找表的方式实现。使用 “不一致性（Disparity）”来描述编码中"1"的位数和"0"的位数的差值，它仅允许有"+2"(  "0"比"1"多两个)、"0"（ "0"与"1"个数相等）以及"-2"（"1"比"0"多两个）这三种状况。 由于数据流不停地从发送端向接收端传输，前面所有已发送数据的不一致性累积产生的状态被称为“运行不一致性（Runing Disparity，RD）”。RD仅会出现+1与-1两种状态，分别代表位"1"比位"0"多或位"0"比位"1"多，其初始值是-1。Next RD值依赖于Current RD以及当前6B码或者4B码的Disparity。根据Current RD的值，决定5B/4B和 3B/4B编码映射方式，如下图所示。
+
+![](../assets/e5b6b.png)
+
+![](../assets/e3b4b.png)
+
+ 当Current RD=-1时，表示之前传输的数据中"0"的个数多于"1"的个数，若6B或4B编码的Disparity=0，则NextRD=-1；若6B或4B编码的Disparity=+2，则Next RD=+1。同样，当Current RD=+1时，表示之前传输的数据中"0"的个数多于"1"的个数，若6B或4B编码的Disparity=0，则NextRD=+1；若6B或4B编码的Disparity=-2，则Next RD=-1。
+
+Rules for running disparity
+
+|previous RD|  Disparity of code word | Disparity chosen | next RD
+|---|---|---|---|
+|−1|  0|   0|   −1|
+|−1  |±2  |+2  |+1|
+|+1  |0   |0   |+1|
+|+1 | ±2  |−2  |−1
+
+
+ 这样，经过8B/10B编码以后，连续的“1”和“0”基本上不会超过5bit，只有在使用comma时，才会出现连续的5个0或1。
+
+多字节编码：
+
+* 两个8b/10b编码器串联，然后用联级的disparity保存在RD寄存器中
+* 多个8b/10b编码器并联，然后使用mux来确定disparity，最后保存在RD寄存器
+
+## NRZ
+
+|code name | complete name| desciption |
+|---|---|---|
+|NRZ|Non-return-to-zero level   |   Appears as raw binary bits without any coding
+|NRZI|Non-return-to-zero inverted    Refers to either an NRZ(M) or NRZ(S) code.
+|NRZM|Non-return-to-zero mark   |Serializer mapping {0: constant, 1: toggle}.
+|NRZS|Non-return-to-zero space  |Serializer mapping {0: toggle, 1: constant}.
+|NRZC|Non-return-to-zero change |
+
+

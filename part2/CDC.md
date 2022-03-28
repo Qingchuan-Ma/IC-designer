@@ -53,7 +53,10 @@ MTBF 影响了哪些跨时钟域的设计细节：
 1. open-loop solution (three edge)
     
     ![](../assets/cdc1.png)
-    
+
+aready原来是1，asend产生一个脉冲，导致FSM aready变为0，同时脉冲转化为了a_en的电平，然后被receive端恢复为了脉冲，然后通知回transmit的FSM端，aready重新变回1
+
+
 2. closed-loop solution
     
     ![](../assets/cdc2.png)
@@ -142,3 +145,8 @@ MTBF 影响了哪些跨时钟域的设计细节：
     ```
 
     ![](../assets/cdc12.png)
+
+
+5. DMUX
+
+![](../assets/dmux.png)
