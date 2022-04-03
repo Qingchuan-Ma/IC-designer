@@ -391,7 +391,7 @@ load hit:
 
 * s0: 计算地址，读TLB，读dcache tag
 * s1: 读dcache data
-* s2: 获得读结果，选择并写回。 PIPT
+* s2: 获得读结果，选择并写回。 VIPT
 
 sta:
 
@@ -420,13 +420,13 @@ sqidx: store queue index
 
 store queue和commited store buffer中也需要存虚地址？
 
-虚地址前传的数据通路：
+虚地址前传的数据通路：load pipeline
 
 * s0: 生成mask和虚拟地址
 * s1: 虚拟地址和mask送到buffer和queue中查询
 * s2: 产生结果，和dcache读出的数据做合并
 
-虚地址前传的控制通路：
+虚地址前传的控制通路：load pipeline
 
 * s0: 虚拟地址送入TLB进行转换
 * s1: TLB返回物理地址，物理地址和mask送入queue和buffer，进行查询（只做地址匹配）
@@ -453,10 +453,268 @@ store queue和commited store buffer中也需要存虚地址？
         + hit则直接返回，miss，则给page walker或queue
         + 三级页表项都缓存了，支持ecc，如果ecc错了，刷新此项，重新进行page walker
     - Page Walker
-        + 
+        + 只访问前两级页表，1G和2M，如果访问到叶子节点（大页或空页），则返回给L1 TLB；否则送往miss queue，访问4K页表
     - miss queue
+        + 接受page cache和page walker的请求
+        + 同时接受N个请求，因为对页表的访问集中于最后一级页表。
+        + 承担miss的缓冲，等到miss消失，到重新访问page cache
+        + 承担访问最后一级页表
     - prefetcher
+        + 由page cache的结果引起预取产生，不会返回给L1 TLB。
+        + 下一行预取算法 
 * repeater: L1到L2物理距离较长，加拍。
 * filter：在repeater的基础上强化，接受DTLB请求，发送给L2。过滤重复请求，项数一定程度决定L2的并行度
 * PMP
 * pma
+
+* feedbackSlow包括的信息
+    - rsIdx，重发指令位置
+    - sourceType，重发原因
+    - sqIdx，前传的时候load发现store的数据没准备好
+
+
+### load pipeline
+
+* s0：
+    - 指令和操作数从rs中读出
+    - 加法器将操作数和立即数相加，计算虚拟地址
+    - 虚拟地址送入TLB进行查询
+    - 虚拟地址送入数据缓存进行tag查询？还是VIPT
+* s1:
+    - TLB产生物理地址
+    - 完成快速异常检查
+    - 物理地址送进数据缓存进行data查询
+    - 虚拟地址和物理地址送入store buffer和queue进行store到load的前传
+    - 根据L1 dcache返回的命中向量和初步异常判断结果，产生wakeup信号
+    - 如果这一级出现了导致重发的事件，需要通知保留站这条指令重发 (feedbackFast)，一旦fast触发，后边流水不在进行
+* s2:
+    - 异常检查
+    - 根据以及缓存以及前传返回结果做数据选择
+    - 根据load要求，对分会结果做剪裁
+    - 更新load queue对应项状态
+        + datavalid
+        + writebacked
+        + miss
+        + pending
+        + released
+    - 整数结果写到cdb common data bus
+    - 浮点结果写到浮点模块
+* s3:
+    - dcache的反馈结果，更新load queue中对应项的状态
+        + 重发可能导致的miss, datavalid为false，标志会重发，而不是在load queue等待refill
+    - 根据 dcache 的反馈结果, 反馈到保留站, 通知保留站这条指令是否需要重发 (feedbackSlow)
+
+load miss 的处理：
+
+* s1，根据tag比较结果，可以知道是否miss，miss，则禁用当前指令的提前唤醒
+* s2，如果miss，load不会写回结果，更新load queue状态，这条miss的load指令等refill，分配mshr
+* s3，分配结果这时才能知道，因此再次更新load queue状态，如果分配失败，则请求保留站重发指令
+* 分配了mshr的话，后续再load queue中侦听refill结果
+
+保留站重发指令的情况：
+
+* TLB miss:
+    - feedbackSlow。 TLB的refill需要时间，因此需要延迟
+* bank conflict:
+    - feedbackFast。指两条load流水线之间bank冲突，以及load和store的cacheline的冲突，不设置延迟可以立即重发
+* MSHR分配失败：
+    - feedbackSlow。不设置延迟可以立即重发
+* Store Data invalid：
+    - feedbackSlow。load前传时的store数据没准备好，会随着feedbackSlow一起把sqIdx反馈给保留站，到时候有了就可以重发，所以延迟不固定
+
+预取指令：这里是指binding-prefetch，软件预取指令：
+
+* 再发现miss时会向dcache的missqueue发出请求，出发对下层的cache访问。
+* 期间屏蔽异常，不会重发
+
+提前唤醒：
+
+* 提前唤醒的指令必须要能正常的执行，意思是可以提前唤醒依赖于这个load的后续指令。
+* s1的阶段发出快速唤醒信号。
+
+前传失败：
+
+* 再s2的时候，附上mark，repalyInst，需要从取指重发。在ROB的尾部会触发重定向？
+
+### load queue
+
+* 80项循环队列
+* 每周期最多
+    - 从dispatch接受4条指令
+    - 从load接受2条指令结果，更新状态
+    - 从dcache接受refill结果，更新load queue中等待此次refill的指令状态
+    - 写回2条miss的load指令，和正常访存流水线征用2个写回端口
+* entry 内容
+    - 物理地址
+    - 虚拟地址(debug用作调试的)
+    - 重填数据位
+    - 状态位
+        + allocated: 表明该项被dispatch分配
+        + datavalid：表明load已经拿到所需数据
+        + writebacked: load已经写回寄存器堆，通知ROB和RS
+        + miss：表明dcache未命中，等待refill
+        + pending: 表明mmio地址，执行被推迟，等待指令成为ROB最后一条指令
+        + release: 表明cacheline被dcache release
+        + error: 表明执行过程中检测到错误
+
+load refill:
+
+* 一次refill会把数据传递到所有等待这一cacheline的load queue项
+* 如果之前进行了前传，则会在refill的时候合并前传的结果
+* 每个周期，load queue会分别从奇偶两列中选出最老的已经refill但没写回的指令，在下一个周期将其通过写回端口写回。
+* 会和load流水线抢占写回端口。load流水线优先级更高
+
+
+load commit:
+
+* load取得结果，写回rob和rf。每周期最多两条指令被写回
+* load queue写回包括
+    - miss之后的refill写回
+    - mmio load写回
+* rob在指令提交后，会产生lcomimt信号，通知load queue这些指令已经成功提交
+* load queue会把allocated 状态更新为false表示已经完成，同时更新队尾指针
+
+redirect:
+
+* 重定向到load queue之后两排内更新load queue状态
+    - 1： 根据robidx找到错误路径指令，allocated设置为false
+    - 2：格努就上一排的结果，统计多少指令被取消，更新enqPtr
+
+违例检查：这是内存模型的要求
+
+* 实现办法是使用重定向，从取指开始重新执行后续的指令
+
+### store pipeline
+
+* robidx和sqidx相同，分别对应一条store指令的数据和地址
+* store addr流水：
+    - 前两个流水负责store的控制信息和地址传给store queue，
+    - 后两个流水及负责等待访存依赖检查
+    - s0: 
+        + 计算虚拟地址，虚拟地址送入TLB
+    - s1: 
+        + TLB产生物理地址
+        + 快读检查异常
+        + 访存依赖检查
+        + 物理地址进入store queue
+    - s2:
+        + 访存依赖检查
+        + 完成全部异常检查和PMA查询，根据结果更新store queue
+    - s3:
+        + 完成访存依赖检查
+        + 通知ROB可以commit
+* store data流水：
+    - 保留站提供data之后，
+    - 立刻将data 写入store queue对应的项
+
+
+TLB miss的处理：
+
+* 和load流水线一样，使用rsFeedback端口反馈是否要重发
+  
+PMA和异常检查：
+
+* mmio等检查结果在data更新到store queue一周期之后才全部完成，此时store流水线会查询最终结果写到store queue
+
+### store queue
+
+* 64项
+* 每周期至多
+    - 从dispatch处接受4条指令
+    - 从 store addr 流水线接收 2 条指令的地址和控制信息
+    - 从 store data 流水线接收 2 条指令的数据
+    - 将 2 条指令的数据写入 committed store buffer
+    - 为 2 条load流水线提供 store 到 load 前递结果
+* entry 内容
+    - 物理地址
+    - 虚拟地址
+    - 数据
+    - 数据有效mask
+    - 状态
+        + allocated
+        + addrvalid
+        + datavalid
+        + committed
+        + mmio
+        + pending: mmio，执行被推迟等待成为ROB最后一条指令
+* store addr
+    - s1在没有TLV miss等问题更新 addrvalid
+    - s2更新mmio和pending，PMA检查是否处于MMIO时序紧张
+* store data
+    - 设置datavalid状态
+
+store commit:
+
+* 同load commite，产生scommit信号，通知store queue这些store已经成功提交，committed更新为true
+
+sbuffer:
+
+* 已经提交的store指令不会取消，按顺序从queue读到buffer。
+* 一周期读数据，下一周期写到sbuffer，只有真的写到sbuffer之前，store queue一直都是有效
+
+flush:
+
+* sbuffer drain，在这个过程中store queue会不断把已经提交的store指令的数据写到sbuffer中
+
+### sbuffer
+
+* 16项以cacheline为单位的数据
+* 每周期最多
+    - 接受2条store queue写入的store指令
+    - 向dcache写一个cacheline
+* 使用PLRU进行替换写入cache
+* entry 内容
+    - 虚实地址
+    - 数据
+    - 数据有效掩码
+    - 状态
+        + state_valid：表明该项有效
+        + state_inflight： 表示已经发出写请求
+        + w_timeout： 等待重发计时器timout，需要重发写请求
+        + w_sameblock_inflight：表明有相同的block在写如dcache，这个时候的指令不会被替换
+
+sbuffer项dcache的写：
+
+* 第一拍选，同时更改装填
+* 第二拍写入请求发到dcache
+* 只有等dcache报告写入成功了之后，sbuffer才会标记为无效
+
+向dcache写入项的选择，优先级高到低
+
+* dcache请求重发到了等待时间了
+* sbuffer刷新
+* 一个sbuffer存在的时间超过阈值
+* sbuffer满了，部分项选择换出
+    - PRLU，在queue写到sbuffer或者queue和某项merge，PRLU会更新
+
+flush:
+
+* 前面讲过了
+
+### 原子指令
+
+状态机：
+
+* 空闲
+* TLB
+* PM：地址异常检查
+* sbuffer flush请求（drain store buffer和store queue？）
+* 等待请求完成
+* 向dcache发原子操作
+* 等dcache返回原子操作结果
+* 写回结果
+  
+store指令，只有addr和data都准备好，才会开始
+
+lr执行之后：
+
+* 阻塞对当前核当前 cacheline 的所有 probe 请求并阻塞后续 lr 的执行, 持续一段时间 (lrscCycles - LRSCBackOff cycles)
+    - 这个时候可以完成constrained LR/SC loop
+    - 当前hart可以不被打扰执行一个成功的SC sequential consistency
+* 持续阻塞后续 lr 的执行, 但允许对这一 cacheline 的 probe 请求执行, 持续一段时间 (LRSCBackOff cycles)
+* 恢复到正常状态
+
+
+异常处理：
+
+直接从pm到finish，不处罚flush，不产生实际访存请求
