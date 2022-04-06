@@ -1,4 +1,16 @@
 
+
+![](../assets/boom4.svg)
+
+![](../assets/boom5.png)
+## Branch Prediction
+
+![](../assets/boom6.svg)
+
+## Rename Stage
+
+![](../assets/boom2.png)
+
 * map_table 记录逻辑寄存器与物理寄存器之间的映射关系，是speculative的
 * free_list记录物理寄存器的空闲状态；
 * busy_table 记录寄存器是否可读。
@@ -33,6 +45,8 @@
     - 比如说要写一个逻辑寄存器，刚开始他对应的物理寄存器就是stale pdst
     - 在这个指令commit之后，这个stale pdst需要被写回到free list
 
+## ROB and Dispatch Stage
+
 * ROB
     - valid
     - busy
@@ -51,3 +65,4 @@
     - Front-end要directed to 合适的PC
 
 * the instructions ahead of the commit head and behind the PNR head are guaranteed to be non-speculative, even if they have not yet written back.
+
