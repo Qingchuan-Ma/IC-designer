@@ -717,4 +717,199 @@ lr执行之后：
 
 异常处理：
 
-直接从pm到finish，不处罚flush，不产生实际访存请求
+直接从pm到finish，不触发flush，不产生实际访存请求
+
+### D cache
+
+* 128KB, 8-way组相联，PLRU替换策略，SECDED校验
+* 和l2 cache配合一起处理aliasing问题
+* 内部模块
+    - Load pipeline
+    - Main pipeline
+    - Refill pipeline
+    - Atomics Unit
+    - Miss queue
+    - Probe Queue, 处理一致性请求
+    - Writeback Queue
+
+#### Load pipeline
+
+* 如果miss，进入miss queue，然后refill，如果需要替换，则用writeback Queue来将替换块写回
+* 和load unit的load各个流水级意义对应，逻辑上被视为同一个流水线，非阻塞
+* s0:
+    - v index查tag
+* s1:
+    - 获得tag查询结果，把hit和miss送入下一级寄存器
+    - 获取meta查询结果
+    - 检查tag error
+    - 物理地址查询data
+    - 根据PLRU，选出替换的way（在miss的时候需要）
+    - 检查bank冲突
+    - 生成fastwakeup和load pipeline一致
+* s2:
+    - 更新PLRU
+    - 获取data结果
+    - 如果miss，尝试分配MSHR，如果queue满则告诉s3重新wakeup
+    - 检查data error
+    - 
+
+#### Main pipeline
+
+Store buffer重发原则：
+
+* 如果Dcache hit
+    - 在main pipeline中完成对Dcache的写入
+* 如果miss且miss queue满
+    - 一段时间后重发
+* 如果miss且miss queue成功接受
+    - miss queue继续执行后续操作
+    - 完成后通知sbuffer，并通过refill pipeline更新dcache
+* 如果有被替换的块，在writeback queue写回
+    - 只有真的替换的块到了Dcache之后，被替换出去的才会被writeback queue往下写，valid?
+
+* 该流水为dcache主流水线，用于处理store, probe,原子操作和替换操作
+* 负责所有需要征用writeback queue向下层cache发起请求/写回的指令执行
+* s0: 
+    - 仲裁优先级最高的（以下优先级从高到低）
+        + probe_req
+        + replace_req
+        + store_req
+        + atomic_req
+    - 根据请求信息判断资源是否准备好
+    - tag,meta读请求
+* s1: 
+    - 获得tag，meta读请求的结果
+    - 进行tag匹配检查，判断是否命中，命中会被寄存，下一级就知道需要访问miss queue了
+    - 如果需要替换，获得PLRU提供的替换选择结果（miss的时候这个有用）
+    - 根据读出的meta进行权限检查
+    - 提前判断是否需要执行 miss queue 访问
+* s2:
+    - 获得读data的结果，与要写入的数据拼合
+    - 如果miss，尝试写入miss queue
+* s3:
+    - 更新meta,data,tag
+    - 如果需要项下层写回，生成write_back queue访问请求，尝试写writeback queue
+    - 在relase操作生效更新meta时，向load queue给出release信号进行违例判断(应该还是RVWMO的某个要求？)
+    - 对于原子操作的支持
+        + AMO在这一级两拍，第一拍做运算，再把结果写回dcache
+        + LR/SR指令会检查其reservation set queue
+
+
+
+#### Refill pipeline
+
+* 进入miss queue之前会选出替换way，因此在写回的时候，不需要再明确替换路，所以只需要一个周期就可以把L2的数据填入DCache，不需要再访问一边DCache
+* Refill和Main都会对DCache写，因此会有冲突，保证Main Pipe前后读写数据的一致性，即读写不会被Refill的写大端，因此某些情况会被阻塞
+    - Refill的请求和s1有set冲突，为了放送时序要求，值根据set阻塞即可
+    - Refill的请求和s2/s2有冲突，并且way一样（根据way_en）
+    - 说明Main对Dcache先写，但是读操作呢？
+        + 比如load的s1 tag匹配，但是同时refill把该way覆盖掉了，load的s2又获取了数据，不就出问题了么
+
+
+#### Miss queue
+
+* 16项entry，接受load\store\atomic的请求，从L2 refill，并把load 数据返回给load queue
+* load具体操作/store类似：
+    - 分配空entry，记录相关信息
+    - 根据way_en所在块是否有效，判断是否需要替换，如果需要则给main发replace_req
+    - 同时向L2发Acquire
+        + 如果是整个block的覆盖写，则发AcquirePerm(不需要读合并的操作了)
+        + 否则发给AcquireBlock
+    - 等L2 Grant或GrantData（后者带数据，前者可能用于store）
+    - 收到GrantData每个beat把数据转发给Load queue
+    - 在收到 Grant / GrantData 第一个 beat 后向 L2 返回 GrantAck;
+    - 在收到 Grant / GrantData 最后一个 beat, 并且 replace 请求已经完成后, 向 Refill Pipe 发送 refill 请求, 并等待应答, 完成数据回填;
+        + store miss 在最终完成回填后要向 Store Buffer 返回应答, 表示 store 已完成.
+    - 释放entry
+* 原子指令：
+    - 分配空entry，记录相关信息
+    - 向L2发送AcquireBlock指令
+    - L2返回GrantData
+* 也支持一定程度的合并请求
+* 合并条件：
+    - 块地址相同时：
+        + A的acquire还没握手，且A是load；B是load或store
+        + A的acquire已经法出去了，但没有收到Grant，或者收到了Grant但是没有转发给Load queue，且A是load或store；B是load
+* 拒绝条件：
+    - 块地址相相同，但是不满足合并条件
+    - 块地址不同，但是处于同一个slot（即同一个set和way）
+        + 假设两个位于同一个 set 但不同 tag 的 load 请求, 先后在 Load Pipeline 上 miss 了, 但是两个 load 决定替换相同的 way, 并分别分配了一项 Miss Entry, 最终导致后 refill 的块把先 refill 的块覆盖掉了
+* 空项分配条件
+    - 在没有 Miss Entry 想要合并或者拒绝新的 miss 请求的情况下
+        + 如果 Miss Queue 有空项, 分配新的 Miss Entry;
+        + 如果 Miss Queue 已满, 拒绝新的 miss 请求, 该请求会在一定时间后 replay.
+
+
+#### probe queue
+
+* 16项，接受来自L2的probe请求，发给main pipe，修改probe的权限
+* 处理流程：
+    - 分配一项空entry
+    - 向main发probe请求
+    - 等待main返回应答
+    - 释放entry
+
+#### Alias Problem
+
+* L2 Cache 的目录会维护每一个物理块对应的别名位 (即虚地址索引超出页偏移的部分)
+* 保证某一个物理地址在 L1 Cache 中只有一种别名位. 当 L1 Cache 在某个物理地址上想要获取不同的别名位, 即不同的 virtual index 时, L2 Cache 会将另一个 virtual index 对应的 cache 块 probe 下来
+* probe的时候会有B通道的data域传递2bit的额外index位，用这个和页偏移concat，得到真的index
+
+#### Writeback Queue
+
+* 18项写回队列。release，或者对probe请求作出应答(ProbeAck)，支持Release和ProbeAck之间相互合并减少请求数目
+* 队列满不接受任何请求，不满则接受，可能合并也可能分配空项
+* 状态位
+    - s_invalid: 空项
+    - s_sleep: 准备release，但暂时sleep等待refill唤醒，说明refill了之后他就可以被替换走了。
+        + 处于sleep的块需要和dcache中的同步
+    - s_release_req: 正在发送release或probe ack
+    - s_release_resp: 等待release ack请求
+* 不考虑请求合并
+    - ProbeAck: s_invalid -> s_release_req -> s_invalid
+    - Release: s_invalid -> s_sleep -> s_release_req -> s_release_resp -> s_invalid
+* 考虑合并
+    - release合并ProbeAck: release的过程中可能被动放弃
+        + s_sleep阶段直接release变probeack
+        + s_release_req
+            * release还没握手，直接变
+            * release处理完再处理probeAck
+    - probeAck合并release
+* miss queue的请求如果发现和writeback中某一项地址相同，则miss请求会被阻塞
+
+#### 自定义L1操作
+
+寄存器分类：
+
+* 指令寄存器,CSR_CACHE_OP
+* 指令状态寄存器,CSR_OP_FINISH
+* 一级缓存控制寄存器,配置参数
+
+执行流程：
+
+* 使用csr指令写入参数配置寄存器，清空OP_FINISH寄存器
+* 向CSR_CACHE_OP写入指令码
+* 直到CSR_OP_FINISH==1
+* 使用csr指令读结果寄存器获得结果
+
+### 访存依赖预测
+
+* Load Wait Table
+* Store Sets
+
+如果预测到一条 load 指令可能违例, 则这条 load 指令需要在保留站中等待到之前的 store 都发射之后才能发射.
+
+SSIT 和 LFST。第一次听说，得去看下原始论文
+
+### TileLink
+
+*满足cache一致性的总线协议*
+
+一致性请求分类：
+* Acquire 获取权限
+* Probe 被动释放权限
+    - 一般来自L2 Cache的Probe请求，
+    - 在主流水线中修改被Probe的块的权限
+    - 返回应答，同时写回Dirty数据
+* Relase 主动释放权限
+
