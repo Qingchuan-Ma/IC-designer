@@ -855,6 +855,9 @@ Store buffer重发原则：
 * 保证某一个物理地址在 L1 Cache 中只有一种别名位. 当 L1 Cache 在某个物理地址上想要获取不同的别名位, 即不同的 virtual index 时, L2 Cache 会将另一个 virtual index 对应的 cache 块 probe 下来
 * probe的时候会有B通道的data域传递2bit的额外index位，用这个和页偏移concat，得到真的index
 
+
+DCache 中有有一个虚地址为0x0000 的块，虚地址 0x0000 和 0x1000 映射到了同一个物理地址，且这两个地址的别名是不一样的；此时 DCache 向 L2 Acquire 了地址为 0x1000 的块，并在 Acquire 请求的 user 域中记录了别名 (0x1)，L2 在读目录后发现请求命中，但是 Acquire 的别名 (0x1) 和 L2 记录的 DCache 在该物理地址的别名 (0x0) 不同，于是 L2 会发起一个 Probe 子请求，并在 Probe 的 data 域中记录要 probe 下来的别名 (0x0)；Probe 子请求完成后，L2 再将这个块返回给 DCache，并将 L2 client directory 中的别名改为 (0x1)。
+
 #### Writeback Queue
 
 * 18项写回队列。release，或者对probe请求作出应答(ProbeAck)，支持Release和ProbeAck之间相互合并减少请求数目
@@ -913,3 +916,54 @@ SSIT 和 LFST。第一次听说，得去看下原始论文
     - 返回应答，同时写回Dirty数据
 * Relase 主动释放权限
 
+## L2/L3 Cache
+
+* inclusive directory(L1所有的state tag都有保存，相联度会很高)
+* non-inclusive data(也就是说不是所有L1的值都会在L2以下的Cache中存在)
+* 地址低位分Slice提升并发度，每个Slice内部的MSHR数量可以分配，负责具体的任务管理
+* Self Directory/Client Directory 分别为当前层级 Cache Data 所对应的目录和上层 Cache Data 所对应的目录
+* MSHR是负责做所有事情的
+
+### Directory
+
+* 本地目录
+    - state: 
+        + Tip/Trunk/Branch/Invalid 中的一种
+        + Invalid(None):没有权限
+        + Branch：只读
+        + Trunk：可读可写
+        + TIP：拥有T权限的上的叶子节点；说明该节点上层只有N或B权限；如果是T权限而不是TIP权限，说明上层一定还有T权限节点
+    - dirty
+    - clientStates: 上层权限，仅在state非invalid时这个有意义
+    - prefetch：指示该数据块是否是被预取的
+* 上层目录
+    - state:
+    - alias： alias bit
+    
+* 分配进入MHSR时，查询本地和上层目录
+    - 如果命中会把对应的源数据传递到对应的MSHR中；
+    - 如果没有命中，会传递替换算法的到的路，本地使用PLRU算法得到的路，上层使用随机替换
+* MHSR处理结束时，会写目录
+    - 目录4个写请求，分别接受本地(上层)元数据、本地(上层)tag的写入，写高于读请求
+    - 写请求会精心仲裁
+* Tilelink？
+    - 2个读口sourceC_r, sourceD_r、3个写口sinkD_w, sourceD_w, sinkC_w
+
+### MSHR
+
+* 接受上层Acquire/Release或下层Probe，分配MSHR，读目录获取该地址在本层及以上的权限信息，MSHR根据这些信息决定：
+    - 权限：如何更新self/client directory权限
+    - 请求：是否向上下层发送子请求，等待子请求的相应
+* inclusive directory，MSHR可以拿到请求地址在ICache、DCache和L2 Cache的所有权限信息，
+
+### Best-OFFset 硬件预取
+
+
+
+## ref
+
+Zhao, Li, et al. "NCID: a non-inclusive cache, inclusive directory architecture for flexible and efficient cache hierarchies." Proceedings of the 7th ACM international conference on Computing frontiers. 2010. 
+
+Kessler R E . The Alpha 21264 Microprocessor[J]. IEEE Micro, 1999, 19(2):24-36. 
+
+Chrysos G Z , Emer J S . Memory Dependence Prediction using Store Sets[J]. ACM SIGARCH Computer Architecture News, 2002, 26(3):142-153. 
