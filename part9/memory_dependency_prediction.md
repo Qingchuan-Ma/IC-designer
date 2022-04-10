@@ -85,3 +85,60 @@ store sets： 每个load指令会有一个相联的store指令
 * 允许每个load指定最多一个store dependence。如果有新的violation直接替代，允许一个store存在多个store sets
 * 不限制store set size，也不限制store能出现在几个store sets里
 
+
+* 每个load可能4中情况：
+    - 没有预测（该load的store sets为空）
+    - 预测正确
+    - 依赖错误
+    - violation
+    
+* 为了解决false dep，给store set的每个store加一个2-bit的counter
+    - violation，counter设置成最大
+    - 如果false则减1；反之加1
+    - 只有1x才强制order
+    
+### Implementation
+
+* 假定store set里的stores对同一个地址写他是顺序的；即消除了内存WAW冒险
+* Store Set Identifier Table(SSIT)
+    - 使用common tag保存store sets中的load和stores
+* Last Fetched Store Table(LFST)
+    - 保存每个store set最近fetched的store的信息
+
+* 只要是fetch到load指令，访问SSIT，获取SSID
+    - 如果合理，则访问LFST，获取他的store set最近获取的store指令的inum
+* 只要是fetch到store指令，访问SSIT，找到valid SSID
+    - 找到了，说明属于一个store set
+    - 然后访问其LFST，获取最近的store指令
+    - 本store指令也会是这个store的dependent
+    - 所以他会更新这个表，把自己的inum加到这个表
+    - 表明本store才是最后fetched的store
+
+* 该办法不允许store存在多个store set当中
+    - 因为store也会索引SSIT，找到一个SSID
+    - 如果load store pair发生一次vialation
+        + store处无，load处无，则都分配同一个
+        + store处无，load处有，则把load对应的SSID copy到store PC index处；然后查看LFST的最新inum
+        + store处有，load处无，则把store对应的SSID copy到load PC index处
+        + store处有，load处有；但两个不SSID不对应，需要merging
+            * 两个sets中的一个会声明为winner
+            * loser的store set会合并成winner的store-set
+* winner仲裁算法：
+    - 最简单的是选更小store set number的；发现这个还挺好使的
+    - store-set merging可能会潜在地创建一个加载对另一个加载的存储的错误依赖关系。我们没有发现这种错误的依赖关系会对性能造成影响
+        + 因为如果两个load share一个store set，相当可能一个load的conflicting stores和另外一个load的conflicting stores在cpu上运行不再同一个时刻，也就永远不会相交，也就产生不了错误依赖关系
+
+* 解决一下多个PC的index映射到同一个SSIT entry的问题
+    - 一般处理就三种：周期性清除、用个counter、加上tag
+    - 实验发现周期性清除效果还不错，而且还简单
+    - tag可以减少SSIT entry数量，但是会增加tag array和比较逻辑
+
+* 建议：
+    - 4K entry SSIT and a 128 entry LFST
+    - cyclic clearing to invalidate the SSIT every million cycles.
+    
+### Conclusion
+
+* limiting the total number of loads that can have their own store set
+* limiting stores to being in at most one store set at once
+* constraining stores within a store set to execute in order. 
