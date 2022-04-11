@@ -44,3 +44,44 @@
     - 这些信息在每次预测之后会存入queue中，然后被之后的Icache pipeline所使用
 
 ![](../assets/FTB.png)
+
+
+## Elastic instruction fetching
+
+decoupling的缺点：
+
+* 增加流水深度，加大flush惩罚
+* 需要大BTB存储target address
+
+ELF：
+
+* steady state的情况下是decoupled mode
+* 但是在pipeline flush之后couples，来隐藏解藕带来的额外的延迟
+
+Entry Content:
+
+* entry 最多可以包含16个sequential instructions
+* 其中的2个指令可以是 "observed taken before" branches
+    - 也就是说永远不跳转的条件分支不会占用两个分支位置
+    
+Entry Establishment:
+
+* 在commit的时候建立BTB entries
+* 碰到非条件跳转
+* 碰到第三个条件语句
+* 已经经过了16个sequential instruction
+
+如果一个never observed taken重新变成taken的时候，BTB entry需要修改，因此可能会导致一个entry分成两个
+
+现有Current BPred PC
+
+* 访问N个分支预测结果（paper中是2个） & 访问BTB
+* 根据BTB的branch information和branch preditions结果，决定next BPred PC:
+    - target of one of the N conditional branches
+    - target of an indirect branch （如果BTB entry里track）
+    - target of an unconditional direct branch （如果BTB entry里track）
+    - fall-through of the BTB entry
+    
+L-ELF:
+
+* 遇到conditional or indirect branch时，coupled fetcher stall，直到DCF赶上了Coupled Fetcher
