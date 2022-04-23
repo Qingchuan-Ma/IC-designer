@@ -105,6 +105,9 @@ ShiftingGlobalHistory:
 * predHist = 256长度的uint
 * update 根据传入的shift, 是否taken产生新的shiftGlobalHistory
 * update 根据2个vec[bool] br_valid, real_taken_mask，更新shiftGlobalHistroy
+  * br_valid[0:1] 代表branch valid；如果br_valid[1]，则last_valid_idx = 2；如果br_valid[0]，则last_valid_idx=1；否则last_valid_idx=0；
+  * real_taken_mask[0:1]，如果real_taken_mask[1]，则first_taken_idx=1；如果real_taken_mask[0]，则first_taken_idx=2；否则如果first_taken_idx=?这个real_taken_mask必须有一个1？
+  * 选择last_valid_idx和real_taken_mask里小的那个。更新。这个更新完全没理解。。。
 * read: 给定n，强转为Bool，返回bools[n]
 * 重定义===  =/=
 
@@ -123,21 +126,21 @@ AllFoldedHistories:
 
 FoldedHistory: 
 
-* parameter: len, complen, max_update_num
+* parameter: len, complen(folded len), max_update_num(2)
 * folded_hist: 长度为complen
 * methods:
   * need_oldest_bits: 如果len大于compLen，则为1
   * info: 返回(len, compLen)
-  * oldest_bit_to_get_from_ghr:  (len-1: len - max_update_num -1)
-  * oldest_bit_pos_in_folded: upon.map(_ % compLen)
-  * oldest_bit_wrap_around: 返回indexedSeq[Boolean] upon.map(_ / compLen > 0)
-  * oldest_bit_start: oldest_bit_pos_in_folded.head
-  * get_oldest_bits_from_ghr: 传入ghr和histPtr，输出(len-1: len - max_update_num -1)+histPtr+1的indexedSeq[Bool]
+  * oldest_bit_to_get_from_ghr:  (len-1, len-2)
+  * oldest_bit_pos_in_folded: (len-1 % compLen, len-2 % compLen)
+  * oldest_bit_wrap_around: (len-1 / compLen > 0, len-2 / compLen)
+  * oldest_bit_start: len-1 % compLen
+  * get_oldest_bits_from_ghr: 传入ghr和histPtr，输出(ghr(len+histPtr), ghr(len+histPtr-1))
   * circular_shift_left: 循环左移shamt的动作
-  * update: 传入ghr, histPtr, num, taken或者 ob, num, taken
-    * 有两种通路，一种是使用pre-read的oldest bits，一种从ghr中读 
-    * bitsets_xor: 传入len，bitsets，
-    * 没看懂。。。。
+  * update: 慢通路，传入ghr, histPtr, num, taken
+  * update: 快通路，传入ob, num, taken
+    * bitsets_xor: len, bitsets (2维数组，数组的内容是tuple2[int,bool])
+      * 
   
 
 
@@ -347,3 +350,17 @@ Ready: ready
 
 
 Seq
+
+
+PriorityMux(): mux tree, 前边的优先
+
+val hotValue = chisel3.util.PriorityMux(Seq(
+ io.selector(0) -> 2.U,
+ io.selector(1) -> 4.U,
+ io.selector(2) -> 8.U,
+ io.selector(4) -> 11.U,
+))
+
+PriorityEncoder(): 返回低位高的bit position
+
+PriorityEncoder("b0110".U) // results in 1.U
