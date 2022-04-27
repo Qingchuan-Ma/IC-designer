@@ -310,57 +310,107 @@ set history tag
 
 tageNTable2 = 4 意思是有4个表
 TotalBits = set*(1+tag+tagCtrBits+1) .reduce(_ + _)
+BtSize = 2048 (base table)
+bypassentries = 8(base table的bypass table)
 
-tagCtrBits: 是干嘛的？
+tagCtrBits: cnter 3-bit
+
+get_unshuffle_bits：传入idx，返回idx[0]
+get_phy_br_idx: 传入unhashed_idx 和 br_logic idx 返回 unhashed_idx[0] ^ br_lidx
+get_lgc_br_idx: 传入unhashed_idx 和 br_phy idx 返回 unhashed_idx[0] ^ br_pidx
 
 
 TageReq:
-
 * pc： 虚拟地址
 * ghist: global history
-* folded_histroy
+* allFoldedHistories
+
+TageResp:
+* ctr
+* u?
+
+TageUpdate:
+* pc
+* allfoldedhistories
+* ghist
+* // update tag and ctr
+* mask
+* takens
+* alloc
+* oldCtrs
+* // update u
+* uMask
+* us
+* reset_u
+
+TageMeta:
+* providers
+* providerResp
+* altUsed
+* altDiffers
+* basecnts
+* allocates
+* takens
+* scMeta
+* pred_cycle
+* use_alt_on_na
+
+
+TageBTable: basic table
+* bimAddr
+* s1_cnt: 就是一个vec，把读出的两个way映射成了一个vec，每个元素2-bit
+* set: 2048, way: 2, data: 2-bit(无tag)
+* 还有一个WrBypass, 8项，idx为11位。存放的pidx
+* 给一个u_idx，hit，则找到oldCtrs；反之使用oldCtrs = io.update_cnt
+* 更新时，使用oldCtrs进行更新。
+* 两个问题：为什么要区分lidx和pidx；为什么要使用bypass
+  
+WrBypass:
+
+* numEntries
+* idxWidth
+* numWays
+* tagWidth
+* 本质是一个CAMTemplate 内容为idx+tag，项数量为numEntries，readWidth = 1和一个Mem(numEntries, Vec(2, data))
+* 只有write的请求，给出write_idx+tag（cam的内容，用来找hit_idx的）
+  * 如果cam hit，则数据更新hit_idx的mem里；同时返回数据；hit是单周期就可以返回的
+  * 如果没有hit，则数据写到enq_idx的mem里；write_idx+tag写到cam里内容里，enq_idx写到cam的idx里
 
 
 
+CAMTemplate: data, set, readWidth
+
+* r: req, resp
+* w: valid, bits(index data)
+* 本质是一个reg vec，长度是set数量，内容大小是data.getWidth
+* r的时候给出一个readWidth为长度的vec数据内容，返回一个Vec(readWidth, Vec(set, Bool()))；单周期内返回
+* w的时候带上valid和bits(index data)，把数据写进去即可
 
 
-# Chisel
+TageTable: 
+* nRows: 传入参数
+* histLen: 传入参数
+* tagLen: 传入参数
+* tableIdx: 传入参数
+* TageEntry(valid, tag, ctr)
+* io:
+  * TageReq
+  * TageResp
+  * TageUpdate
+* SRAM_SIZE = 256
+* nRowsPerBr = nRows / 2
+* nBanks = 8
+* bankSize = nRowsPerBr / nBanks
+* bankFoldWidth: 如果bankSize > SRAM_SIZE 那么bankSize / SRAM_SIZE；否则为1
+* uFoldedWidth = nRowsPerBr / SRAM_SIZE
+* get_bank_mask：给idx，返回一个bool vec，表明访问哪个bank
+* get_bank_idx：给idx，返回idx >> 3；这个就是去除bank之后的idx
+* get_way_in_bank: 给idx，如果需要折叠，则返回idx中的折叠bit
+* perBankWrbypassEntries = 8 跟base Tage一样
+* getUnhashedIdx:  pc >> instOffsetBits
+* us:   FoldedSRAMTemplate
 
 
-Read-Write Memories:
+FoldedSRAMTemplate:
 
-* SyncReadMem:
-  * If the same memory address is both written and sequentially read on the same clock edge, or if a sequential read enable is cleared, then the read data is undefined.
-  * Values on the read data port are not guaranteed to be held until the next read cycle. If that is the desired behavior, external logic to hold the last read value must be added.
-
-```
-val countOn = true.B // increment counter every clock cycle
-val (counterValue, counterWrap) = Counter(countOn, 4)
-when (counterWrap) {
-  ...
-}
-```
-
-
-Decoupled(...) creates a producer / output ready-valid interface (i.e. bits is an output).
-Flipped(Decoupled(...)) creates a consumer / input ready-valid interface (i.e. bits is an input).
-
-Valid: valid & bits
-Ready: ready
-
-
-Seq
-
-
-PriorityMux(): mux tree, 前边的优先
-
-val hotValue = chisel3.util.PriorityMux(Seq(
- io.selector(0) -> 2.U,
- io.selector(1) -> 4.U,
- io.selector(2) -> 8.U,
- io.selector(4) -> 11.U,
-))
-
-PriorityEncoder(): 返回低位高的bit position
-
-PriorityEncoder("b0110".U) // results in 1.U
+setIdx -> ridx | width | way

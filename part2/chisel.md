@@ -237,11 +237,56 @@ Vec和Bundle也可以混搭：
     - 类型参数可以用于func, module和bundle
 
 
+## Chisel
+
+
+Read-Write Memories:
+
+* SyncReadMem:
+  * If the same memory address is both written and sequentially read on the same clock edge, or if a sequential read enable is cleared, then the read data is undefined.
+  * Values on the read data port are not guaranteed to be held until the next read cycle. If that is the desired behavior, external logic to hold the last read value must be added.
+
+```
+val countOn = true.B // increment counter every clock cycle
+val (counterValue, counterWrap) = Counter(countOn, 4)
+when (counterWrap) {
+  ...
+}
+```
+
+
+Decoupled(...) creates a producer / output ready-valid interface (i.e. bits is an output).
+Flipped(Decoupled(...)) creates a consumer / input ready-valid interface (i.e. bits is an input).
+
+Valid: valid & bits
+Ready: ready
+
+
+Seq
+
+
+PriorityMux(): mux tree, 前边的优先
+
+val hotValue = chisel3.util.PriorityMux(Seq(
+ io.selector(0) -> 2.U,
+ io.selector(1) -> 4.U,
+ io.selector(2) -> 8.U,
+ io.selector(4) -> 11.U,
+))
+
+PriorityEncoder(): 返回低位高的bit position
+
+PriorityEncoder("b0110".U) // results in 1.U
+
 
 
   
 
 
 
+## Scala
 
+* Seq
+* Set
+* Map
 
