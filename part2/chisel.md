@@ -286,7 +286,102 @@ PriorityEncoder("b0110".U) // results in 1.U
 
 ## Scala
 
-* Seq
-* Set
-* Map
+### Basic
 
+* Expression
+* Values
+* Variable
+* Block: {}代码块最后一个expr的结果就是整个block的结果
+* Function
+  * anonymous function
+  * name function
+* Method
+  * def + name + parameter list(s) + return type + body
+  * 也可以没有parameter list
+  * 支持嵌套
+* Class
+  * setters: def y_= (newValue: Int): Unit
+* Case Class
+  * 传入的参数作为val，不可更改
+  * 可以用copy进行复制
+* Objects
+  * companion object, apply method(构造函数)
+* Traits
+* Main Method
+
+### Unified Types
+
+
+![](../assets/scala2.svg)
+
+* Any: 所有类型的超集
+  * universal methods: equals, hashCode, toString
+* AnyVal: 数值类
+  * Double, Float, Long, Int, Short, Byte, Unit, Boolean, Char
+  * Unit是没有任何信息的type，能够用()声明；没有返回值的时候可以用Unit返回
+* AnyRef: 引用类，非数值类都是这种
+  * List, Option, YourClass
+* Type Casting:
+  * Byte -> Short -> Int -> Long -> Float -> Double
+  * Char -> Int
+* Nothing: 所有类型的子类
+* Null: 所有引用类的子类
+
+### Trait
+
+* subtyping: 能直接用
+* methods: 能被重载
+* Mixins: with
+
+### Tuple
+
+* Tuple2[String, Int]
+* _1, _2访问
+* 在需要有名字的element的时候，选择case class会更好
+  
+### High-Order Function
+
+* higher order function可以将function作为parameter传递，也可以作为结果返回
+* method也可能会变成function
+* 非常灵活
+
+### Multiple Parameter
+
+* 支持多个参数列表
+* implicit parameter
+
+### Match 
+
+* x match {case 1 => '1' case_ => 'other'}
+* 可以匹配case class；也可以匹配类型
+  * x match {case p: Phone => p.screenOff}
+
+### Collections class
+
+* List, ListBuffer, Vector, ArrayBuffer, Map, Set
+* List
+  * element +: list
+  * list ++: list
+  * 1 :: 2 :: 3 :: Nil
+* Vec
+  * element +: vector
+  * vector ++ vector
+  * 可以下标访问
+* Map
+  * Map("AK" -> "Alaska")
+  * map += element
+  * map ++= map
+* Set
+  * set += 1
+  * set.add()
+
+![](../assets/scala1.png)
+
+### Implicit parameters
+
+一个方法可以有一个隐式参数列表，由参数列表开头的隐式关键字标记。如果该参数列表中的参数没有像往常一样传递，Scala 将查看它是否可以获得正确类型的隐式值，如果可以，则自动传递它。
+
+Scala 将查找这些参数的位置分为两类：
+
+* Scala 将首先在调用带有隐式参数块的方法时查找可以直接访问（不带前缀）的隐式定义和隐式参数。
+* 然后它在与隐式候选类型关联的所有伴随对象中查找标记为隐式的成员。
