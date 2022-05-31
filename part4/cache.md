@@ -75,6 +75,9 @@
             * alloy cache
         + two full DRAM accesses: one to get the initial tag and a follow-on access to the main memory
 
+
+A case for two-way skewed-associative caches
+
 ![](../assets/cache0.png)
 
 ### Non-blocking cache implementation
