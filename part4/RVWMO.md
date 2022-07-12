@@ -25,25 +25,25 @@ Progress Axiom
 
 如果a和b满足程序顺序，并且满足PPO => 满足全局顺序。
 
-内存操作a在保留内存顺序上比内存操作b前（因此在全局内存上也前）是指，a在程序顺序上比b前，a和b都访问常规主存而非IO区，并且以下任何一条成立：
+内存操作a在保留内存顺序上比内存操作b前（因此在全局内存上也前）是指，a在程序顺序上比b前，a和b都访问常规主存而非IO区，并且以下任何一条成立：一共13条
 
 * Overlapping-Address Orderings:
     1. b是一个store操作，并且a和b访问重叠内存地址（相同地址强制Load->Store）
     2. a和b都是loads，x是a和b都读出的字节，在a和b的程序顺序中没有任何对x的store，并且a和b返回x的值由不同的内存操作写出来（也就是说，ab不能由同一个store产生或者ab之间有store(第3点除外)，这样就可以乱序）
     3. a是由一个AMO或者SC指令生成，b是一个load，并且b返回a写的值（也就是说，这种情况下是不能乱序的）
 * Explicit Synchronization
-    4. 有FENCE指令强制a在b之前
-    5. a有一个acquire annotation
-    6. b有一个release annotation
-    7. a和b都有 RC_sc annotations
-    8. a和b是paired
+    1. 有FENCE指令强制a在b之前
+    2. a有一个acquire annotation
+    3. b有一个release annotation
+    4. a和b都有 RC_sc annotations
+    5. a和b是paired
 * Syntactic Dependencies
-    9. b和a语法地址相关
-    10. b和a语法数据相关
-    11. b是store，并且b和a有语法控制相关
+    1. b和a语法地址相关
+    2. b和a语法数据相关
+    3. b是store，并且b和a有语法控制相关
 * Pipeline Dependencies
-    12. b是load，并且在a和b在程序顺序之间存在某个store m使得m有地址或者数据依赖于a并且b返回m写的值。
-    13. b是store，并且a和b在程序顺序之间存在某条指令m使得m有地址依赖于a
+    1. b是load，并且在a和b在程序顺序之间存在某个store m使得m有地址或者数据依赖于a并且b返回m写的值。
+    2. b是store，并且a和b在程序顺序之间存在某条指令m使得m有地址依赖于a
 
 ## Syntactic Dependencies 语法相关
 

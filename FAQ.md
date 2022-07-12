@@ -651,3 +651,107 @@ A:
 
 微架构可以判断rs1和rs2是否相同简化实现
 ```
+
+
+```
+Q: issue queue和reservation station区别
+```
+
+```
+Q: ld/st pipeline的实现
+```
+
+```
+Q: 有了reservation station为什么还需要store queue
+```
+
+```
+Q: decoupled的BP和coupled的BP有什么优点和缺点
+```
+
+```
+Q: dcache和prefetcher怎么实现
+```
+
+```
+Q: MESI中E有啥用
+
+A: I->S的时候发现如果是exclusive的可以升级到E，E->M是silent不需要通知其他CPU
+```
+
+
+```
+Q: MOSI中O有啥用
+
+A:  - 在MSI或MESI中，MorE->S时，需要发送data到memory controller和requestor，owner就变成了memory controller。O状态可以消除这个状态更换过程中的更新LLC/memory的信息传递
+    - 同时可以消除非必要的对LLC/memory的写操作（如果在写回LLC之前又被写了）
+    - 其次还可以加快其他core的访问速度，cache比memory快
+```
+
+```
+Q: ARM的架构
+
+A: big.LITTLE DynamIQ
+DSU: dynamIQ Shared Unit
+建了CPU、L3 cache、Snoop Filter、外围设备总线buses、power management features之间Asynchronous （异步）通信的桥梁。
+cache stashing: 允许相近的coupled accelerators和I/O agents 对部分CPU memory进行direct access
+big.LITTLE需要big cores和LITTLE cores分别动态的进行分频和分压。
+```
+
+```
+Q: M1的架构
+
+A: firestorm + icestorm(Lakefield)
+```
+
+```
+Q: SOC的发展
+
+A：单核->多核->异构系统(UMA unified memory arch)
+HSA: Heterogeneous System Architecture AMD牵头的
+多片die的封装
+```
+![](./assets/uma.jpg)
+
+```
+Q: 12代的实现
+
+A：Alder Lake，10nm，DDR5 PCIE5.0
+因为环形总线的原因导致的10个节点，因此4个小核一个cluster占一个节点，可以8大核+8小核
+P核+E核：Thread Director(硬件调度)
+E不具备P的所有指令集和硬件功能
+Golden cove
+虽然由于decoder数目增加引起流水线增长，但是调整了ops cache的大小跟命中率
+重新调整了BP的算法
+实际四发射拉到了实际六发射
+4int ALU->5int ALU
+大L2，弱L3
+在non-inclusive的情况下，其实增加L2获得的收益，要比增加L3来的要重要
+```
+
+```
+Q: 核内的发展
+
+A：
+Front-end:
+更快的BP，无bubble
+更快的Icache和op-cache的切换
+更快的branch mispredict recovery
+更高精确度
+
+Execution Engine:
+更宽的integer和fp的issue
+更快的FMAC
+更大的execution windows
+
+Load/Store:
+更高的带宽
+improved memory dependence dectetion
+更多的TLB walker
+```
+
+```
+Q：SLC是什么
+
+A：system level cache，可以外设和CPU一同共享的cache
+```
