@@ -755,3 +755,10 @@ Q：SLC是什么
 
 A：system level cache，可以外设和CPU一同共享的cache
 ```
+
+
+1. hold violation的三种解决办法
+2. FPGA的全局时钟资源相关的有
+3. PLI, VPI, DPI
+4. OCV和derate
+5. delay和input transition和output delay有关
