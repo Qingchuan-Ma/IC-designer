@@ -942,8 +942,9 @@ endmodule
         DW01_add #(wordlength) U1(in1,in2,carry_in,sum,carry_out);
         set_implementation implementation_name instance_name
         ```
-        
-
+5. link library: 门级网表实例化的基本单元，也就是门级网表实例化的元件或单元都来自该库。标准单元的bd格式库文件加上pad bd格式库文件再加上ROM，RAM等宏单元库文件
+6. target library: 在mapping时将设计映射到特定工艺所使用的库，也使用目标库的元件综合成设计的门级网表。综合只需要改库。如果用到一些额外的IP，则需要link library
+    
 ## Constraint
 
 ### Environment Constraint
