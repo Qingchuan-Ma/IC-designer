@@ -382,6 +382,34 @@ task [automatic] task_id;
         procedural_statement;
 endtask
 ```
+    
+```verilog
+module  task_calling (adc_a, adc_b, adc_a_conv, adc_b_conv);
+input [7:0] adc_a, adc_b;
+output [7:0] adc_a_conv, adc_b_conv;
+
+reg [7:0] adc_a_conv, adc_b_conv;
+
+task convert;
+input [7:0] adc_in;
+output [7:0] out;
+begin
+    out = (9/5) *( adc_in + 32)
+end
+endtask
+
+always @ (adc_a)
+begin
+  convert (adc_a, adc_a_conv);
+end
+
+always @ (adc_b)
+begin
+  convert (adc_b, adc_b_conv);
+end
+
+endmodule
+```
 
 # Function
 
@@ -399,6 +427,25 @@ function [automatic] [signed] [range_or_type] function_id;
 endfunction
 ```
 
+```verilog
+module  function_calling(a, b, c, d, e, f);
+
+input a, b, c, d, e ;
+output f;
+wire f;
+
+function  myfunction;
+input a, b, c, d;
+begin
+    myfunction = ((a+b) + (c-d));
+end
+endfunction
+
+assign f =  (myfunction (a,b,c,d)) ? e :0;
+
+endmodule
+```
+    
 # System Task and Functions
 
 ## Display task
@@ -512,9 +559,7 @@ endfunction
     end
     ```
     
-
-
-        ![](../assets/verilog3.png)
+![](../assets/verilog3.png)
 
 ## Timing Checks
 
