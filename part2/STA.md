@@ -204,7 +204,7 @@ In the hold timing reports, the arrival time and the required time are computed 
 
 ## Multicycle Path
 
-default意思是指如果不加end或者start。默认就是对应表格上面的行为
+default意思是指如果不加end或者start。默认就是对应表格上面的行为；如果移动capture或者launch，则hold的检查沿默认将会是移动后的capture前一个沿
 
 || Source Clock (-start) Moves the launch edge | Destination Clock (-end) Moves the capture edge|
 |---|---|---|
