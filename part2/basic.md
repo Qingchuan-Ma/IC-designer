@@ -184,7 +184,7 @@ Non-rising|      X|       Q|
 ![](../assets/ff5.png)
 
 * 当CLK为0时，T1导通，但必须保证T2在CLK变为1的时候，输入是稳定的，因此setup时间等于Tt1+Tinv * 2
-* 当CLK为1时，T2导通，B点被锁存，但是由于clock和~clock存在延迟，因此在T2真正导通之前，还需要保持hold时间等于clock到~clock的延迟inv
+* 当CLK为1时，T2导通，B点被锁存，但是由于clock和 \~clock 存在延迟，因此在T2真正导通之前，还需要保持hold时间等于clock到 \~clock 的延迟inv
 
 
 
