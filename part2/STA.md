@@ -1,6 +1,9 @@
 
 ## STA Concepts
 
+* load: C
+* drive: R
+
 * Timing Arc
 * Cell delay
     - Transition delay，定义由这些参数决定，后面的值为一般值
@@ -75,15 +78,17 @@
 
 ## Wireload model
 
-* resistance
-* capacitance
-* area
-* slop
-* fanout_length对
+* 工艺库中存在的数据：
+    - resistance
+    - capacitance
+    - area
+    - slop
+    - fanout_length对
+
 
 * 先确定fanout
-* 在fanout_length对查找长度
-* 长度乘以电容系数，或者R或者面积
+* 在fanout_length对查找
+* 长度乘以电容系数，或者电阻系数或者面积系数就可以知道具体的电容，电阻和面积
 * 如果fanout>最大fanout，则使用slop和最大点进行计算length
 
 
@@ -105,7 +110,7 @@
     - clock jitter: 时钟源产生的抖动，两个时钟周期之间存在差值，在hold的时候检查同一个时钟沿，因此没有jitter，只有skew
     - clock skew: 时钟树不平衡引起的到达两个寄存器的延迟差，在(CTS)clock tree synthesis之后，skew是由工具算出
     - pre-CTS: 
-        + setup = jitter + 预估skew + margin
+        + setup = jitter + 预估skew + margin (=是指应该设置setup的uncertainty为这三者之和)
         + hold = 预估skew + margin
     - post-CTS: skew确定了
         + set_propagateclock
@@ -113,6 +118,7 @@
         + hold = margin
     - -source指source，但是不加指network
 > set_clock_uncertainty -from SYS_CLK -to CFG_CLK -setup 0.2 [get_clocks CLK_CONFIG]
+> 
 > set_clock_uncertainty -from SYS_CLK -to CFG_CLK -hold 0.05 [get_clocks CLK_CONFIG]
 
 * latency
@@ -158,7 +164,7 @@ These rules check that all ports and pins in the design meet the specified limit
 * set_max_transition
     - 设置端口或设计中的最大转换时间.
     - 对于input: transition time = drive * max_cap = dirve * (C_wireload + C_gate)
-    - 对于output: transition time = drive * max_cap = dirve_gate * (C_wireload + C_load)
+    - 对于output: transition time = drive * max_cap = drive_gate * (C_wireload + C_load)
 * set_max_capacitance
 * set_max_fanout
     - fanout_load是无量纲数，而不是电容，它表示对总有效扇出的数值贡献，在lib里有值
@@ -197,6 +203,9 @@ In the hold timing reports, the arrival time and the required time are computed 
 ![](../assets/sta3.png)
 
 ## Multicycle Path
+
+default意思是指如果不加end或者start。默认就是对应表格上面的行为
+
 || Source Clock (-start) Moves the launch edge | Destination Clock (-end) Moves the capture edge|
 |---|---|---|
 |Setup| <---- (backward) |----> (forward) (default)|
